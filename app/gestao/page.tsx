@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../context/AuthContext";
-import { supabase } from "../../lib/supabaseClient";
+import { useAuth } from "../../context/authcontext";
+import { supabase } from "../../lib/supabase";
 
 interface Aluno { id:number; nome:string }
 interface Personal { id:number; nome:string }
