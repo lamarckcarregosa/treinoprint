@@ -16,6 +16,7 @@ interface Treino { id?:number; dia:string; nivel:string; tipo:string; exercicios
 
 export default function Home() {
   const router = useRouter();
+  const { user, loading } = useAuth();
 
   const [alunos,setAlunos] = useState<Aluno[]>([]);
   const [personals,setPersonals] = useState<Personal[]>([]);
@@ -28,60 +29,58 @@ export default function Home() {
   const [tipo,setTipo] = useState("Masculino");
 
   const dataAtual = new Date().toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"});
-const { user, loading } = useAuth();
 
-useEffect(()=>{
-  if(!loading && !user){
-    router.push("/login");
-  }
-},[user,loading]);
+  // proteção
+  useEffect(() => {
+    if (!loading && !user) router.push("/login");
+  }, [user, loading, router]);
 
-if(loading) return <p className="p-6">Carregando...</p>;
-  // Carregar dados via API
-  useEffect(()=>{
-    const fetchData = async()=>{
-      try{
-        const [resAlunos,resPersonals,resTreinos] = await Promise.all([
-          fetch("/api/alunos").then(r=>r.json()),
-          fetch("/api/personals").then(r=>r.json()),
-          fetch("/api/treinos").then(r=>r.json())
+  // carregar dados (só quando logado)
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchData = async () => {
+      try {
+        const [resAlunos, resPersonals, resTreinos] = await Promise.all([
+          fetch("/api/alunos").then(r => r.json()),
+          fetch("/api/personals").then(r => r.json()),
+          fetch("/api/treinos").then(r => r.json()),
         ]);
 
         setAlunos(resAlunos);
         setPersonals(resPersonals);
 
-        // Parse dos exercícios que estão em string JSON
-        const treinosParseados = resTreinos.map((t:any)=>({
+        const treinosParseados = resTreinos.map((t:any) => ({
           ...t,
-          exercicios: typeof t.exercicios === "string" ? JSON.parse(t.exercicios) : t.exercicios
+          exercicios: typeof t.exercicios === "string" ? JSON.parse(t.exercicios) : t.exercicios,
         }));
         setTreinos(treinosParseados);
-
-      }catch(e){
-        console.error("Erro ao carregar dados:",e);
+      } catch (e) {
+        console.error("Erro ao carregar dados:", e);
       }
     };
+
     fetchData();
-  },[]);
+  }, [user]);
 
-  // Filtra os exercícios do treino selecionado (Dia/Nível/Tipo)
-  const exerciciosDoTreino = treinos.find(t=>t.dia===diaSelecionado && t.nivel===nivel && t.tipo===tipo)?.exercicios || [];
+  // ✅ Agora sim pode retornar condicional
+  if (loading) return <p className="p-6">Carregando...</p>;
+  if (!user) return null;
 
-  // Função impressão
-  const imprimirTreino = ()=>{ window.print(); };
+  const exerciciosDoTreino =
+    treinos.find(t => t.dia===diaSelecionado && t.nivel===nivel && t.tipo===tipo)?.exercicios || [];
+
+  const imprimirTreino = () => window.print();
 
   return (
     <main className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
       <div className="bg-white shadow-2xl rounded-3xl w-full max-w-5xl overflow-hidden">
-        {/* HEADER */}
         <div className="bg-black text-white p-4 flex items-center justify-center gap-4">
           <Image src="/logo-sistema.png" alt="Logo" width={90} height={90}/>
           <h4 className="text-xl font-bold">Imprimir Treino</h4>
         </div>
 
         <div className="p-6 space-y-4">
-
-          {/* Seleção Aluno */}
           <div>
             <label className="text-sm font-semibold text-gray-600">Aluno</label>
             <select value={nomeAluno} onChange={e=>setNomeAluno(e.target.value)} className="w-full p-3 border rounded-xl mt-1">
@@ -90,7 +89,6 @@ if(loading) return <p className="p-6">Carregando...</p>;
             </select>
           </div>
 
-          {/* Seleção Personal */}
           <div>
             <label className="text-sm font-semibold text-gray-600 mt-2">Personal</label>
             <select value={nomePersonal} onChange={e=>setNomePersonal(e.target.value)} className="w-full p-3 border rounded-xl mt-1">
@@ -99,31 +97,37 @@ if(loading) return <p className="p-6">Carregando...</p>;
             </select>
           </div>
 
-          {/* Dia / Nível / Tipo */}
           <div className="grid grid-cols-3 gap-2 mt-2">
             <div>
               <label>Dia do treino</label>
-              <select value={diaSelecionado} onChange={e=>setDiaSelecionado(e.target.value)} className="w-full p-3 border rounded-xl">{diasSemana.map(d=><option key={d}>{d}</option>)}</select>
+              <select value={diaSelecionado} onChange={e=>setDiaSelecionado(e.target.value)} className="w-full p-3 border rounded-xl">
+                {diasSemana.map(d=><option key={d}>{d}</option>)}
+              </select>
             </div>
             <div>
               <label>Nível</label>
-              <select value={nivel} onChange={e=>setNivel(e.target.value)} className="w-full p-3 border rounded-xl">{niveis.map(n=><option key={n}>{n}</option>)}</select>
+              <select value={nivel} onChange={e=>setNivel(e.target.value)} className="w-full p-3 border rounded-xl">
+                {niveis.map(n=><option key={n}>{n}</option>)}
+              </select>
             </div>
             <div>
               <label>Tipo</label>
-              <select value={tipo} onChange={e=>setTipo(e.target.value)} className="w-full p-3 border rounded-xl">{tipos.map(t=><option key={t}>{t}</option>)}</select>
+              <select value={tipo} onChange={e=>setTipo(e.target.value)} className="w-full p-3 border rounded-xl">
+                {tipos.map(t=><option key={t}>{t}</option>)}
+              </select>
             </div>
           </div>
 
-          {/* Área de impressão */}
           <div className="print-area bg-white p-6 max-w-sm mx-auto font-mono border border-gray-300 shadow-none mt-4">
             <div className="flex justify-center mb-4">
               <img src="/logo.png" alt="Logo Academia" style={{ width: "130px" }} />
             </div>
+
             <div className="text-center mb-2">
               <p className="text-lg font-bold tracking-widest">TREINO PERSONALIZADO</p>
               <p className="text-[10px] text-gray-500">Sistema TreinoPrint</p>
             </div>
+
             <div className="border-t border-dashed my-3"></div>
 
             <div className="text-xs space-y-1">
@@ -167,5 +171,4 @@ if(loading) return <p className="p-6">Carregando...</p>;
       </div>
     </main>
   );
-
 }
