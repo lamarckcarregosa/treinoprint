@@ -120,7 +120,7 @@ export default function Home() {
 
           <div className="print-area bg-white p-6 max-w-sm mx-auto font-mono border border-gray-300 shadow-none mt-4">
             <div className="flex justify-center mb-4">
-              <img src="/logo.png" alt="Logo Academia" style={{ width: "130px" }} />
+              <img src="/LOGO.png" alt="Logo Academia" style={{ width: "130px" }} />
             </div>
 
             <div className="text-center mb-2">
@@ -172,3 +172,4 @@ export default function Home() {
     </main>
   );
 }
+
