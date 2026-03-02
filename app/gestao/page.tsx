@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "../../context/AuthContext";
+import { supabase } from "../../lib/supabase";
 
 const logout = async ()=>{
   await supabase.auth.signOut();
@@ -39,6 +39,14 @@ useEffect(()=>{
 
 if(loading) return <p className="p-6">Carregando...</p>;
 export default function Gestao() {
+
+  
+  return (
+    <div>
+      ...
+    </div>
+  );
+}
 
   const dias = ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
   const niveis = ["Iniciante","Intermediário","Avançado"];

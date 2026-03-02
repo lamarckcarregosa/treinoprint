@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-mport { useAuth } from "@/context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 
 const diasSemana = ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
 const niveis = ["Iniciante","Intermediário","Avançado"];
