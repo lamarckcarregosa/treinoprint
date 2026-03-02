@@ -10,7 +10,7 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  loading: true
+  loading: true,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -18,10 +18,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-      setLoading(false);
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (mounted) {
+          setUser(data.user);
+        }
+      } catch (err) {
+        console.log("Erro ao buscar usuário:", err);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
     };
 
     getUser();
@@ -29,10 +40,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_, session) => {
         setUser(session?.user ?? null);
+        setLoading(false); // <- GARANTE que loading nunca trava
       }
     );
 
     return () => {
+      mounted = false;
       listener.subscription.unsubscribe();
     };
   }, []);
