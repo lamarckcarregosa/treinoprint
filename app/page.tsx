@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../context/authcontext";
+import { useAuth } from "../context/authcontext";
 
 const diasSemana = ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
 const niveis = ["Iniciante","Intermediário","Avançado"];
@@ -167,4 +167,5 @@ if(loading) return <p className="p-6">Carregando...</p>;
       </div>
     </main>
   );
+
 }
