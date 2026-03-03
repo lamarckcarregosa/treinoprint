@@ -1,25 +1,19 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import type { NextRequest } from "next/server";
+import { supabase } from "@/lib/supabase"; // ajuste se seu caminho for diferente
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+type Ctx = { params: Promise<{ id: string }> };
 
-// =============================
-// DELETE - EXCLUIR TREINO
-// =============================
-export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  const { id } = await params;
+
   const { error } = await supabase
-    .from("treinos_modelos")
+    .from("treinos_modelos") // ou "treinos" se for sua tabela real
     .delete()
-    .eq("id", params.id);
+    .eq("id", id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
   return NextResponse.json({ success: true });
