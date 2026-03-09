@@ -231,10 +231,11 @@ export default function AlunoPage() {
 
       const json = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        alert(json.error || "Erro ao atualizar aluno");
-        return;
-      }
+     if (!res.ok) {
+  console.error("Erro ao atualizar aluno:", json);
+  alert(json.error || JSON.stringify(json) || "Erro ao atualizar aluno");
+  return;
+}
 
       setEditando(false);
       await carregar();
