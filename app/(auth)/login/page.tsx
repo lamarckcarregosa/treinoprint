@@ -27,143 +27,129 @@ export default function Login() {
     carregarAcademias();
   }, []);
 
-const carregarAcademias = async () => {
-  try {
-    setLoadingAcademias(true);
-    setErro("");
+  const carregarAcademias = async () => {
+    try {
+      setLoadingAcademias(true);
+      setErro("");
 
-    const academiaSalva = localStorage.getItem("treinoprint_academia");
+      const academiaSalva = localStorage.getItem("treinoprint_academia");
 
-    const res = await fetch("/api/academias");
-    const json = await res.json();
+      const res = await fetch("/api/academias");
+      const json = await res.json();
 
-    if (!res.ok) {
-      console.error("Erro API academias:", json);
-      setErro(json.error || "Erro ao carregar academias");
-      return;
-    }
-
-    const lista = json.academias || [];
-    setAcademias(lista);
-
-    if (academiaSalva) {
-      const existe = lista.find((item: Academia) => item.slug === academiaSalva);
-      if (existe) {
-        setAcademia(academiaSalva);
+      if (!res.ok) {
+        console.error("Erro API academias:", json);
+        setErro(json.error || "Erro ao carregar academias");
+        return;
       }
+
+      const lista = json.academias || [];
+      setAcademias(lista);
+
+      if (academiaSalva) {
+        const existe = lista.find((item: Academia) => item.slug === academiaSalva);
+        if (existe) {
+          setAcademia(academiaSalva);
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao carregar academias:", err);
+      setErro("Erro ao carregar academias");
+    } finally {
+      setLoadingAcademias(false);
     }
-  } catch (err) {
-    console.error("Erro ao carregar academias:", err);
-    setErro("Erro ao carregar academias");
-  } finally {
-    setLoadingAcademias(false);
-  }
-};
+  };
 
-const entrar = async () => {
-  try {
-    setErro("");
-    setLoading(true);
+  const entrar = async () => {
+    try {
+      setErro("");
+      setLoading(true);
 
-    const a = academia.trim().toLowerCase();
-    const u = usuario.trim().toLowerCase();
+      const a = academia.trim().toLowerCase();
+      const u = usuario.trim().toLowerCase();
 
-    if (!a || !u || !senha) {
-      setErro("Selecione a academia e preencha usuário e senha");
-      return;
+      if (!a || !u || !senha) {
+        setErro("Selecione a academia e preencha usuário e senha");
+        return;
+      }
+
+      const { data: rpcData, error: rpcError } = await supabase.rpc("buscar_email_login", {
+        p_academia_slug: a,
+        p_usuario: u,
+      });
+
+      if (rpcError) {
+        console.error("Erro RPC buscar_email_login:", rpcError);
+        setErro("Erro ao localizar usuário");
+        return;
+      }
+
+      if (!rpcData || rpcData.length === 0 || !rpcData[0]?.email) {
+        setErro("Academia ou usuário não encontrado");
+        return;
+      }
+
+      const email = rpcData[0].email;
+
+      const loginResponse = await supabase.auth.signInWithPassword({
+        email,
+        password: senha,
+      });
+
+      if (loginResponse.error) {
+        console.error("Erro login:", loginResponse.error);
+        setErro("Usuário ou senha inválidos");
+        return;
+      }
+
+      const userId = loginResponse.data?.user?.id;
+
+      if (!userId) {
+        setErro("Não foi possível identificar o usuário");
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, nome, usuario, tipo, academia_id")
+        .eq("id", userId)
+        .single();
+
+      if (profileError || !profile) {
+        console.error("Erro ao buscar profile:", profileError);
+        setErro("Perfil do usuário não encontrado");
+        return;
+      }
+
+      const academiaSelecionada = academias.find((item) => item.slug === a);
+
+      if (academiaSelecionada) {
+        localStorage.setItem("treinoprint_academia_id", academiaSelecionada.id);
+        localStorage.setItem("treinoprint_academia", academiaSelecionada.slug);
+        localStorage.setItem("treinoprint_academia_nome", academiaSelecionada.nome);
+      }
+
+      localStorage.setItem("treinoprint_usuario", u);
+      localStorage.setItem("treinoprint_user_id", profile.id);
+      localStorage.setItem("treinoprint_user_nome", profile.nome || "");
+      localStorage.setItem("treinoprint_user_tipo", profile.tipo || "");
+
+      if (profile.tipo === "admin") {
+        router.push("/dashboard");
+      } else if (profile.tipo === "personal") {
+        router.push("/treinos");
+      } else if (profile.tipo === "recepcao") {
+        router.push("/alunos");
+      } else {
+        router.push("/");
+      }
+    } catch (err) {
+      console.error("Erro inesperado no login:", err);
+      setErro("Erro inesperado ao entrar");
+    } finally {
+      setLoading(false);
     }
-
-    const { data: rpcData, error: rpcError } = await supabase.rpc("buscar_email_login", {
-      p_academia_slug: a,
-      p_usuario: u,
-    });
-
-    if (rpcError) {
-      console.error("Erro RPC buscar_email_login:", rpcError);
-      setErro("Erro ao localizar usuário");
-      return;
-    }
-
-    if (!rpcData || rpcData.length === 0 || !rpcData[0]?.email) {
-      setErro("Academia ou usuário não encontrado");
-      return;
-    }
-
-    const email = rpcData[0].email;
-
-    const loginResponse = await supabase.auth.signInWithPassword({
-      email,
-      password: senha,
-    });
-
-    if (loginResponse.error) {
-      console.error("Erro login:", loginResponse.error);
-      setErro("Usuário ou senha inválidos");
-      return;
-    }
-
-    const userId = loginResponse.data?.user?.id;
-
-    if (!userId) {
-      setErro("Não foi possível identificar o usuário");
-      return;
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, nome, usuario, tipo, academia_id")
-      .eq("id", userId)
-      .single();
-
-    if (profileError) {
-      console.error("Erro ao buscar profile:", profileError);
-      setErro("Perfil do usuário não encontrado");
-      return;
-    }
-
-    if (!profile) {
-      setErro("Perfil do usuário não encontrado");
-      return;
-    }
-
-    const academiaSelecionada = academias.find((item) => item.slug === a);
-
-    if (academiaSelecionada) {
-      localStorage.setItem("treinoprint_academia_id", academiaSelecionada.id);
-      localStorage.setItem("treinoprint_academia", academiaSelecionada.slug);
-      localStorage.setItem("treinoprint_academia_nome", academiaSelecionada.nome);
-    }
-
-    localStorage.setItem("treinoprint_usuario", u);
-    localStorage.setItem("treinoprint_user_id", profile.id);
-    localStorage.setItem("treinoprint_user_nome", profile.nome || "");
-    localStorage.setItem("treinoprint_user_tipo", profile.tipo || "");
-
-    if (profile.tipo === "admin") {
-      router.push("/dashboard");
-    } else if (profile.tipo === "personal") {
-      router.push("/treinos");
-    } else if (profile.tipo === "recepcao") {
-      router.push("/alunos");
-    } else {
-      router.push("/");
-    }
-  } catch (err) {
-    console.error("Erro inesperado no login:", err);
-    setErro("Erro inesperado ao entrar");
-  } finally {
-    setLoading(false);
-  }
-if (profile.tipo === "admin") {
-  router.push("/dashboard");
-} else if (profile.tipo === "personal") {
-  router.push("/treinos");
-} else if (profile.tipo === "recepcao") {
-  router.push("/alunos");
-} else {
-  router.push("/");
-}
-};
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-zinc-100 via-gray-100 to-zinc-200 flex items-center justify-center px-4">

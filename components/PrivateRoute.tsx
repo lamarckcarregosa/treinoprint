@@ -4,18 +4,23 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "../context/authcontext";
 
-export default function PrivateRoute({ children }: any){
-
+export default function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  useEffect(()=>{
-    if(!loading && !user){
+  useEffect(() => {
+    if (!loading && !user) {
       router.push("/login");
     }
-  },[user,loading]);
+  }, [user, loading, router]);
 
-  if(loading) return <div>Carregando...</div>;
+  if (loading) {
+    return <div className="p-4">Carregando...</div>;
+  }
 
-  return user ? children : null;
+  if (!user) {
+    return null;
+  }
+
+  return <>{children}</>;
 }
