@@ -135,7 +135,7 @@ export default function Login() {
       localStorage.setItem("treinoprint_user_tipo", profile.tipo || "");
 
       if (profile.tipo === "admin") {
-        router.push("/dashboard");
+        router.push("/");
       } else if (profile.tipo === "personal") {
         router.push("/treinos");
       } else if (profile.tipo === "recepcao") {

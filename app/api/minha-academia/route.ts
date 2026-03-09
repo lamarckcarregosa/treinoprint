@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabaseServer
       .from("academias")
-      .select("id, nome, slug, logo_url")
+      .select("id, nome, slug, logo_url, endereco, cnpj")
       .eq("id", academiaId)
       .single();
 

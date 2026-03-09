@@ -7,8 +7,18 @@ export async function GET(req: NextRequest) {
     const academiaId = getAcademiaIdFromRequest(req);
 
     const hoje = new Date();
+    const hojeStr = hoje.toISOString().slice(0, 10);
+
     const inicioHoje = new Date(hoje);
     inicioHoje.setHours(0, 0, 0, 0);
+
+    const ano = hoje.getFullYear();
+    const mes = hoje.getMonth() + 1;
+    const inicioMes = `${ano}-${String(mes).padStart(2, "0")}-01`;
+    const proximoMes = new Date(ano, hoje.getMonth() + 1, 1);
+    const fimMes = `${proximoMes.getFullYear()}-${String(
+      proximoMes.getMonth() + 1
+    ).padStart(2, "0")}-01`;
 
     const { count: totalAlunos, error: alunosError } = await supabaseServer
       .from("alunos")
@@ -22,11 +32,26 @@ export async function GET(req: NextRequest) {
       .gte("created_at", inicioHoje.toISOString())
       .order("created_at", { ascending: false });
 
-    const { data: financeiro, error: financeiroError } = await supabaseServer
-      .from("dashboard_financeiro")
-      .select("receita_mes, despesas, ponto_equilibrio")
+    const { data: pagamentosMes, error: pagamentosError } = await supabaseServer
+      .from("financeiro_pagamentos")
+      .select("id, valor, status, vencimento")
       .eq("academia_id", academiaId)
-      .maybeSingle();
+      .gte("vencimento", inicioMes)
+      .lt("vencimento", fimMes);
+
+    const { data: despesasMesData, error: despesasError } = await supabaseServer
+      .from("financeiro_despesas")
+      .select("id, valor, data_lancamento")
+      .eq("academia_id", academiaId)
+      .gte("data_lancamento", inicioMes)
+      .lt("data_lancamento", fimMes);
+
+    const { data: inadimplentesData, error: inadimplentesError } = await supabaseServer
+      .from("financeiro_pagamentos")
+      .select("id, valor, vencimento")
+      .eq("academia_id", academiaId)
+      .eq("status", "pendente")
+      .lt("vencimento", hojeStr);
 
     if (alunosError) {
       return NextResponse.json({ error: alunosError.message }, { status: 500 });
@@ -36,8 +61,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: impressoesError.message }, { status: 500 });
     }
 
-    if (financeiroError) {
-      return NextResponse.json({ error: financeiroError.message }, { status: 500 });
+    if (pagamentosError) {
+      return NextResponse.json({ error: pagamentosError.message }, { status: 500 });
+    }
+
+    if (despesasError) {
+      return NextResponse.json({ error: despesasError.message }, { status: 500 });
+    }
+
+    if (inadimplentesError) {
+      return NextResponse.json({ error: inadimplentesError.message }, { status: 500 });
     }
 
     const listaImpressoes = impressoesHoje || [];
@@ -87,6 +120,20 @@ export async function GET(req: NextRequest) {
       dia: item.dia || "-",
     }));
 
+    const receitaMes =
+      (pagamentosMes || [])
+        .filter((p) => p.status === "pago")
+        .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+
+    const despesasMes =
+      (despesasMesData || []).reduce((acc, item) => acc + Number(item.valor || 0), 0);
+
+    const pontoEquilibrio = despesasMes;
+    const emAberto =
+      (pagamentosMes || [])
+        .filter((p) => p.status === "pendente")
+        .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+
     return NextResponse.json({
       alunosCadastrados: totalAlunos || 0,
       treinosHoje: listaImpressoes.length,
@@ -96,9 +143,14 @@ export async function GET(req: NextRequest) {
       treinosPorNivel,
       treinosRecentes,
       financeiro: {
-        receitaMes: Number(financeiro?.receita_mes || 0),
-        despesas: Number(financeiro?.despesas || 0),
-        pontoEquilibrio: Number(financeiro?.ponto_equilibrio || 0),
+        receitaMes,
+        despesas: despesasMes,
+        pontoEquilibrio,
+        emAberto,
+        inadimplencia: (inadimplentesData || []).reduce(
+          (acc, item) => acc + Number(item.valor || 0),
+          0
+        ),
       },
     });
   } catch (error: any) {

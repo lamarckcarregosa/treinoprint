@@ -1,54 +1,65 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-export default function HomePainelPage() {
-  const [nome, setNome] = useState("Usuário");
-  const [tipo, setTipo] = useState("");
-  const [academia, setAcademia] = useState("");
+type Atalho = {
+  titulo: string;
+  subtitulo: string;
+  rota: string;
+};
 
-  useEffect(() => {
-    setNome(localStorage.getItem("treinoprint_user_nome") || "Usuário");
-    setTipo(localStorage.getItem("treinoprint_user_tipo") || "");
-    setAcademia(localStorage.getItem("treinoprint_academia_nome") || "");
-  }, []);
+export default function HomePage() {
+  const router = useRouter();
+
+  const atalhos: Atalho[] = [
+    { titulo: "Dashboard", subtitulo: "Visão geral", rota: "/dashboard" },
+    { titulo: "Imprimir", subtitulo: "Impressão de treinos", rota: "/imprimir" },
+    { titulo: "Alunos", subtitulo: "Cadastro e consulta", rota: "/alunos" },
+    { titulo: "Treinos", subtitulo: "Gerenciar treinos", rota: "/treinos" },
+    { titulo: "Personais", subtitulo: "Cadastro de profissionais", rota: "/personals" },
+    { titulo: "Financeiro", subtitulo: "Mensalidades e despesas", rota: "/financeiro" },
+    { titulo: "Usuários", subtitulo: "Controle de acesso", rota: "/usuarios" },
+    { titulo: "Pagamentos", subtitulo: "Gestão de pagamentos", rota: "/pagamentos" },
+  ];
+
+  const nome = typeof window !== "undefined"
+    ? localStorage.getItem("treinoprint_user_nome") || "Usuário"
+    : "Usuário";
+
+  const academia = typeof window !== "undefined"
+    ? localStorage.getItem("treinoprint_academia_nome") || ""
+    : "";
+
+  const tipo = typeof window !== "undefined"
+    ? localStorage.getItem("treinoprint_user_tipo") || ""
+    : "";
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-black text-gray-900">Início</h1>
         <p className="text-gray-500 mt-2">
-          Bem-vindo, {nome} {academia ? `• ${academia}` : ""}
+          Bem-vindo, {nome} • Academia {academia}
         </p>
       </div>
 
-      <div className="rounded-2xl bg-white p-6 shadow-sm border">
-        <p className="text-gray-700">
-          Perfil atual: <strong>{tipo || "não definido"}</strong>
+      <div className="bg-white rounded-2xl shadow p-4">
+        <p>
+          Perfil atual: <strong>{tipo}</strong>
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <Link href="/dashboard" className="rounded-2xl border bg-white p-5 shadow-sm hover:shadow-md transition">
-          <h2 className="text-lg font-bold">Dashboard</h2>
-          <p className="text-sm text-gray-500 mt-2">Visão geral</p>
-        </Link>
-
-        <Link href="/imprimir" className="rounded-2xl border bg-white p-5 shadow-sm hover:shadow-md transition">
-          <h2 className="text-lg font-bold">Imprimir</h2>
-          <p className="text-sm text-gray-500 mt-2">Impressão de treinos</p>
-        </Link>
-
-        <Link href="/alunos" className="rounded-2xl border bg-white p-5 shadow-sm hover:shadow-md transition">
-          <h2 className="text-lg font-bold">Alunos</h2>
-          <p className="text-sm text-gray-500 mt-2">Cadastro e consulta</p>
-        </Link>
-
-        <Link href="/treinos" className="rounded-2xl border bg-white p-5 shadow-sm hover:shadow-md transition">
-          <h2 className="text-lg font-bold">Treinos</h2>
-          <p className="text-sm text-gray-500 mt-2">Gerenciar treinos</p>
-        </Link>
+        {atalhos.map((item) => (
+          <button
+            key={item.rota}
+            onClick={() => router.push(item.rota)}
+            className="bg-white rounded-2xl shadow p-5 text-left hover:shadow-md transition"
+          >
+            <p className="font-bold text-lg">{item.titulo}</p>
+            <p className="text-sm text-gray-500 mt-2">{item.subtitulo}</p>
+          </button>
+        ))}
       </div>
     </div>
   );

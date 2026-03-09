@@ -8,10 +8,15 @@
   "dependencies": {
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",
+    "exceljs": "^4.4.0",
+    "framer-motion": "^12.35.2",
     "lucide-react": "^0.577.0",
     "next": "^16.1.6",
+    "pix-payload": "^1.0.4",
+    "qrcode": "^1.5.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react-qr-code": "^2.0.18",
     "recharts": "^3.8.0"
   },
   "devDependencies": {

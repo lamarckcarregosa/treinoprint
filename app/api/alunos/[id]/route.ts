@@ -6,25 +6,28 @@ type Params = {
   params: Promise<{ id: string }>;
 };
 
-export async function DELETE(req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest, { params }: Params) {
   try {
     const academiaId = getAcademiaIdFromRequest(req);
     const { id } = await params;
 
-    const { error } = await supabaseServer
+    const { data, error } = await supabaseServer
       .from("alunos")
-      .delete()
+      .select(
+        "id, nome, telefone, endereco, data_nascimento, cpf, plano, data_matricula, status, foto_url"
+      )
       .eq("id", id)
-      .eq("academia_id", academiaId);
+      .eq("academia_id", academiaId)
+      .single();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(data);
   } catch (error: any) {
     return NextResponse.json(
-      { error: error.message || "Erro ao excluir aluno" },
+      { error: error.message || "Erro ao buscar aluno" },
       { status: 400 }
     );
   }

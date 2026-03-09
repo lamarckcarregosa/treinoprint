@@ -8,9 +8,13 @@ export default function PainelLayout({
 }) {
   return (
     <AuthGuard>
-      <div className="flex min-h-screen bg-gray-100">
-        <Sidebar />
-        <main className="flex-1 p-6">{children}</main>
+      <div className="min-h-screen bg-gradient-to-br from-zinc-100 via-slate-100 to-zinc-200">
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <main className="flex-1 p-3 md:p-6">
+            <div className="mx-auto max-w-7xl">{children}</div>
+          </main>
+        </div>
       </div>
     </AuthGuard>
   );

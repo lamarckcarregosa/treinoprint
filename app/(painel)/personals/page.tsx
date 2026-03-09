@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 
 type Personal = {
-  id: number | string;
+  id: number;
   nome: string;
+  telefone?: string;
+  cref?: string;
 };
 
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
@@ -27,25 +29,31 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
 
 export default function PersonalsPage() {
   const [personals, setPersonals] = useState<Personal[]>([]);
-  const [novoPersonal, setNovoPersonal] = useState("");
   const [loading, setLoading] = useState(true);
-  const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [cref, setCref] = useState("");
+
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [salvando, setSalvando] = useState(false);
 
   const carregarPersonals = async () => {
     try {
       setErro("");
+
       const res = await apiFetch("/api/personals", { cache: "no-store" });
       const json = await res.json().catch(() => []);
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao carregar personals");
+        setErro(json.error || "Erro ao carregar personais");
         return;
       }
 
       setPersonals(Array.isArray(json) ? json : []);
     } catch {
-      setErro("Erro ao carregar personals");
+      setErro("Erro ao carregar personais");
     }
   };
 
@@ -62,46 +70,82 @@ export default function PersonalsPage() {
     init();
   }, []);
 
-  const cadastrarPersonal = async () => {
-    const nome = novoPersonal.trim();
-    if (!nome) return;
+  const limparFormulario = () => {
+    setNome("");
+    setTelefone("");
+    setCref("");
+    setEditandoId(null);
+    setErro("");
+  };
 
+  const salvarPersonal = async () => {
     try {
-      setSalvando(true);
       setErro("");
 
-      const res = await apiFetch("/api/personals", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ nome }),
-      });
+      if (!nome.trim()) {
+        setErro("Preencha o nome do personal");
+        return;
+      }
+
+      setSalvando(true);
+
+      const payload = {
+        nome: nome.trim(),
+        telefone: telefone.trim(),
+        cref: cref.trim(),
+      };
+
+      const res = await apiFetch(
+        editandoId ? `/api/personals/${editandoId}` : "/api/personals",
+        {
+          method: editandoId ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao cadastrar personal");
+        setErro(json.error || "Erro ao salvar personal");
         return;
       }
 
-      setNovoPersonal("");
+      limparFormulario();
       await carregarPersonals();
     } finally {
       setSalvando(false);
     }
   };
 
-  const excluirPersonal = async (id: number | string) => {
-    if (!confirm("Excluir este personal?")) return;
+  const editarPersonal = (personal: Personal) => {
+    setEditandoId(personal.id);
+    setNome(personal.nome || "");
+    setTelefone(personal.telefone || "");
+    setCref(personal.cref || "");
+    setErro("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const excluirPersonal = async (id: number) => {
+    const confirmar = confirm("Deseja realmente excluir este personal?");
+    if (!confirmar) return;
 
     const res = await apiFetch(`/api/personals/${id}`, {
       method: "DELETE",
     });
 
+    const json = await res.json().catch(() => ({}));
+
     if (!res.ok) {
-      alert("Erro ao excluir personal");
+      alert(json.error || "Erro ao excluir personal");
       return;
+    }
+
+    if (editandoId === id) {
+      limparFormulario();
     }
 
     await carregarPersonals();
@@ -111,52 +155,118 @@ export default function PersonalsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-black text-gray-900">Personais</h1>
-        <p className="text-gray-500 mt-2">Cadastro e gerenciamento de personals</p>
+        <p className="text-gray-500 mt-2">
+          Cadastro e gerenciamento de personais
+        </p>
       </div>
 
       <section className="bg-white rounded-2xl shadow p-6 space-y-4">
-        <h2 className="font-semibold">Novo personal</h2>
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="font-semibold">
+            {editandoId ? "Editar personal" : "Novo personal"}
+          </h2>
 
-        <div className="flex gap-2">
-          <input
-            value={novoPersonal}
-            onChange={(e) => setNovoPersonal(e.target.value)}
-            placeholder="Nome do personal"
-            className="border rounded-xl p-3 flex-1"
-          />
-          <button
-            onClick={cadastrarPersonal}
-            disabled={salvando}
-            className="bg-black text-white rounded-xl px-4 disabled:opacity-60"
-          >
-            {salvando ? "Salvando..." : "Cadastrar"}
-          </button>
+          {editandoId ? (
+            <button
+              onClick={limparFormulario}
+              className="text-sm px-4 py-2 rounded-xl border"
+            >
+              Cancelar edição
+            </button>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">
+              Nome
+            </label>
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              className="w-full border rounded-xl p-3"
+              placeholder="Nome do personal"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">
+              Telefone
+            </label>
+            <input
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
+              className="w-full border rounded-xl p-3"
+              placeholder="(79) 99999-9999"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">
+              CREF
+            </label>
+            <input
+              value={cref}
+              onChange={(e) => setCref(e.target.value)}
+              className="w-full border rounded-xl p-3"
+              placeholder="Ex: 123456-G/SE"
+            />
+          </div>
         </div>
 
         {erro ? <p className="text-sm text-red-600">{erro}</p> : null}
+
+        <button
+          onClick={salvarPersonal}
+          disabled={salvando}
+          className="bg-blue-600 text-white rounded-xl px-5 py-3 disabled:opacity-60"
+        >
+          {salvando
+            ? "Salvando..."
+            : editandoId
+            ? "Atualizar personal"
+            : "Cadastrar personal"}
+        </button>
       </section>
 
       <section className="bg-white rounded-2xl shadow p-6">
-        <h2 className="font-semibold mb-4">Lista de Personais</h2>
+        <h2 className="font-semibold mb-4">Personais cadastrados</h2>
 
         {loading ? (
           <p className="text-gray-500">Carregando...</p>
         ) : personals.length === 0 ? (
           <p className="text-gray-500">Nenhum personal cadastrado.</p>
         ) : (
-          <div className="space-y-2">
-            {personals.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between border rounded-xl px-4 py-3"
-              >
-                <span>{p.nome}</span>
-                <button
-                  onClick={() => excluirPersonal(p.id)}
-                  className="text-red-600 text-sm"
-                >
-                  Excluir
-                </button>
+          <div className="space-y-3">
+            {personals.map((personal) => (
+              <div key={personal.id} className="border rounded-2xl p-4">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <p className="font-bold">{personal.nome}</p>
+                    <p className="text-sm text-gray-600">
+                      Telefone: {personal.telefone || "-"}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      CREF: {personal.cref || "-"}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => editarPersonal(personal)}
+                      className="text-blue-600 text-sm"
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      onClick={() => excluirPersonal(personal.id)}
+                      className="text-red-600 text-sm"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

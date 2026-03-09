@@ -8,9 +8,9 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabaseServer
       .from("alunos")
-      .select("id, nome, academia_id")
+      .select("id, nome, telefone, endereco, data_nascimento")
       .eq("academia_id", academiaId)
-      .order("nome", { ascending: true });
+      .order("nome");
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(data || []);
   } catch (error: any) {
     return NextResponse.json(
-      { error: error.message || "Erro ao buscar alunos" },
+      { error: error.message || "Erro ao listar alunos" },
       { status: 400 }
     );
   }
@@ -30,19 +30,25 @@ export async function POST(req: NextRequest) {
     const academiaId = getAcademiaIdFromRequest(req);
     const body = await req.json();
 
-    const nome = String(body.nome || "").trim();
+    const { nome, telefone, endereco, data_nascimento } = body;
 
     if (!nome) {
       return NextResponse.json(
-        { error: "Nome do aluno é obrigatório" },
+        { error: "Nome é obrigatório" },
         { status: 400 }
       );
     }
 
     const { data, error } = await supabaseServer
       .from("alunos")
-      .insert([{ nome, academia_id: academiaId }])
-      .select("id, nome, academia_id")
+      .insert({
+        nome,
+        telefone,
+        endereco,
+        data_nascimento,
+        academia_id: academiaId,
+      })
+      .select()
       .single();
 
     if (error) {

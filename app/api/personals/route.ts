@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabaseServer
       .from("personals")
-      .select("id, nome, academia_id")
+      .select("id, nome, telefone, cref, academia_id")
       .eq("academia_id", academiaId)
       .order("nome", { ascending: true });
 
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(data || []);
   } catch (error: any) {
     return NextResponse.json(
-      { error: error.message || "Erro ao buscar personals" },
+      { error: error.message || "Erro ao listar personais" },
       { status: 400 }
     );
   }
@@ -31,18 +31,25 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     const nome = String(body.nome || "").trim();
+    const telefone = String(body.telefone || "").trim();
+    const cref = String(body.cref || "").trim();
 
     if (!nome) {
       return NextResponse.json(
-        { error: "Nome do personal é obrigatório" },
+        { error: "Nome é obrigatório" },
         { status: 400 }
       );
     }
 
     const { data, error } = await supabaseServer
       .from("personals")
-      .insert([{ nome, academia_id: academiaId }])
-      .select("id, nome, academia_id")
+      .insert({
+        nome,
+        telefone,
+        cref,
+        academia_id: academiaId,
+      })
+      .select()
       .single();
 
     if (error) {
