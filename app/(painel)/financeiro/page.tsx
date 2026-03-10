@@ -13,6 +13,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import ProtegePagina from "@/components/ProtegePagina";
 
 type Resumo = {
   receitaMes: number;
@@ -61,21 +62,9 @@ type Pagamento = {
   forma_pagamento?: string | null;
 };
 
-async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
-  const academiaId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("treinoprint_academia_id")
-      : null;
+import { apiFetch } from "@/lib/apiFetch";
 
-  const headers = new Headers(init?.headers || {});
-  if (academiaId) headers.set("x-academia-id", academiaId);
-
-  return fetch(input, {
-    ...init,
-    headers,
-  });
-}
-
+ 
 function formatBRL(valor: number | undefined) {
   return Number(valor || 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -103,7 +92,7 @@ function CardInfo({
   );
 }
 
-export default function FinanceiroPage() {
+function FinanceiroPageContent() {
   const router = useRouter();
 
   const hoje = new Date();
@@ -149,8 +138,8 @@ export default function FinanceiroPage() {
   const [salvandoPagamento, setSalvandoPagamento] = useState(false);
 
   const [pixQrCode, setPixQrCode] = useState("");
-const [pixCopiaECola, setPixCopiaECola] = useState("");
-const [gerandoPix, setGerandoPix] = useState(false);
+  const [pixCopiaECola, setPixCopiaECola] = useState("");
+  const [gerandoPix, setGerandoPix] = useState(false);
 
   const carregarTudo = async () => {
     try {
@@ -203,27 +192,22 @@ const [gerandoPix, setGerandoPix] = useState(false);
     }
   };
 
-  const gerarPixFake = async (alunoNome: string, valor: number, competencia: string) => {
-  try {
-    setGerandoPix(true);
+  const gerarPix = async (valor: number) => {
+    const pix = new PixPayload({
+      pixKey: "79996320601",
+      merchantName: "TREINOPRINT",
+      merchantCity: "POÇO VERDE",
+      amount: valor.toFixed(2),
+      message: "Mensalidade Academia",
+    });
 
-    const chavePix = "79999999999";
-    const payload = [
-      "PIX TREINOPRINT",
-      `Aluno: ${alunoNome}`,
-      `Competência: ${competencia}`,
-      `Valor: ${formatBRL(valor)}`,
-      `Chave: ${chavePix}`,
-    ].join("\n");
+    const payload = pix.getPayload();
 
-    const qrBase64 = await QRCode.toDataURL(payload);
+    const qr = await QRCode.toDataURL(payload);
 
+    setPixQrCode(qr);
     setPixCopiaECola(payload);
-    setPixQrCode(qrBase64);
-  } finally {
-    setGerandoPix(false);
-  }
-};
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -808,96 +792,6 @@ const [gerandoPix, setGerandoPix] = useState(false);
       </div>
 
       <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <h2 className="font-semibold">Mensalidades</h2>
-
-          <div className="flex flex-col md:flex-row gap-3">
-            <input
-              type="month"
-              value={competencia}
-              onChange={(e) => setCompetencia(e.target.value)}
-              className="border rounded-xl p-3"
-            />
-
-            <select
-              value={statusFiltro}
-              onChange={(e) => setStatusFiltro(e.target.value)}
-              className="border rounded-xl p-3 w-full md:w-56"
-            >
-              <option value="pendente">Pendentes</option>
-              <option value="pago">Pagas</option>
-            </select>
-          </div>
-        </div>
-
-        {pagamentos.length === 0 ? (
-          <p className="text-gray-500">Nenhuma mensalidade encontrada.</p>
-        ) : (
-          <div className="space-y-3">
-            {pagamentos.map((item) => (
-              <div
-                key={item.id}
-                className="border rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
-              >
-                <div>
-                  <p className="font-bold">{item.aluno_nome}</p>
-                  <p className="text-sm text-gray-600">
-                    Competência: {item.competencia}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Vencimento: {item.vencimento}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Valor: {formatBRL(item.valor)}
-                  </p>
-                  <p className="text-sm text-gray-600">Status: {item.status}</p>
-                  {item.data_pagamento ? (
-                    <p className="text-sm text-green-600">
-                      Pago em: {item.data_pagamento}
-                    </p>
-                  ) : null}
-                  {item.forma_pagamento ? (
-                    <p className="text-sm text-blue-600">
-                      Forma de pagamento: {item.forma_pagamento}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  {item.status !== "pago" ? (
-                    <button
-                      onClick={() => {
-                        setPagamentoSelecionado(item);
-                        setFormaPagamento("pix");
-                      }}
-                      className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2"
-                    >
-                      Receber pagamento
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => abrirComprovante(item.id)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2"
-                      >
-                        Comprovante
-                      </button>
-                      <button
-                        onClick={() => estornarPagamento(item.id)}
-                        className="bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl px-4 py-2"
-                      >
-                        Estornar
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
         <div className="flex items-center justify-between gap-4 mb-4">
           <h2 className="font-semibold">Inadimplência por aluno</h2>
           <span className="text-sm text-gray-500">
@@ -1183,5 +1077,13 @@ const [gerandoPix, setGerandoPix] = useState(false);
         </div>
       )}
     </div>
+  );
+}
+
+export default function FinanceiroPage() {
+  return (
+    <ProtegePagina permissao="financeiro">
+      <FinanceiroPageContent />
+    </ProtegePagina>
   );
 }

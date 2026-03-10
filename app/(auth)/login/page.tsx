@@ -9,6 +9,14 @@ type Academia = {
   id: string;
   nome: string;
   slug: string;
+  logo_url?: string | null;
+};
+
+const MAPA_SUPERADMIN: Record<string, string> = {
+  superadmin: "superadmin@treinoprint.com",
+  "superadmin@treinoprint.com": "superadmin@treinoprint.com",
+  lamarck: "lamarck16@gmail.com",
+  "lamarck16@gmail.com": "lamarck16@gmail.com",
 };
 
 export default function Login() {
@@ -32,13 +40,15 @@ export default function Login() {
       setLoadingAcademias(true);
       setErro("");
 
-      const academiaSalva = localStorage.getItem("treinoprint_academia");
+      const academiaSalva =
+        typeof window !== "undefined"
+          ? localStorage.getItem("treinoprint_academia")
+          : null;
 
       const res = await fetch("/api/academias");
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        console.error("Erro API academias:", json);
         setErro(json.error || "Erro ao carregar academias");
         return;
       }
@@ -47,10 +57,7 @@ export default function Login() {
       setAcademias(lista);
 
       if (academiaSalva) {
-        const existe = lista.find((item: Academia) => item.slug === academiaSalva);
-        if (existe) {
-          setAcademia(academiaSalva);
-        }
+        setAcademia(academiaSalva);
       }
     } catch (err) {
       console.error("Erro ao carregar academias:", err);
@@ -60,50 +67,101 @@ export default function Login() {
     }
   };
 
-  const entrar = async () => {
+  const salvarPermissoesUsuario = async (
+    profileId: string,
+    academiaId?: string | null
+  ) => {
     try {
-      setErro("");
+      if (!academiaId) {
+        localStorage.removeItem("treinoprint_permissoes");
+        window.dispatchEvent(new Event("treinoprint-permissoes-updated"));
+        return;
+      }
+
+      const res = await fetch("/api/usuarios/permissoes", {
+        headers: {
+          "x-academia-id": academiaId,
+          "x-profile-id": profileId,
+        },
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok || !json) {
+        localStorage.removeItem("treinoprint_permissoes");
+        window.dispatchEvent(new Event("treinoprint-permissoes-updated"));
+        return;
+      }
+
+      localStorage.setItem("treinoprint_permissoes", JSON.stringify(json));
+      window.dispatchEvent(new Event("treinoprint-permissoes-updated"));
+    } catch {
+      localStorage.removeItem("treinoprint_permissoes");
+      window.dispatchEvent(new Event("treinoprint-permissoes-updated"));
+    }
+  };
+
+  const handleLogin = async () => {
+    try {
       setLoading(true);
+      setErro("");
 
-      const a = academia.trim().toLowerCase();
-      const u = usuario.trim().toLowerCase();
+      const academiaDigitada = academia.trim().toLowerCase();
+      const usuarioDigitado = usuario.trim().toLowerCase();
 
-      if (!a || !u || !senha) {
-        setErro("Selecione a academia e preencha usuário e senha");
+      if (!usuarioDigitado || !senha) {
+        setErro("Preencha usuário ou email e senha");
         return;
       }
 
-      const { data: rpcData, error: rpcError } = await supabase.rpc("buscar_email_login", {
-        p_academia_slug: a,
-        p_usuario: u,
-      });
+      let emailLogin = "";
 
-      if (rpcError) {
-        console.error("Erro RPC buscar_email_login:", rpcError);
-        setErro("Erro ao localizar usuário");
-        return;
+      if (MAPA_SUPERADMIN[usuarioDigitado]) {
+        emailLogin = MAPA_SUPERADMIN[usuarioDigitado];
+      } else if (usuarioDigitado.includes("@")) {
+        emailLogin = usuarioDigitado;
+      } else {
+        if (!academiaDigitada) {
+          setErro("Informe a academia para usuário comum");
+          return;
+        }
+
+        const { data: rpcData, error: rpcError } = await supabase.rpc(
+          "buscar_email_login",
+          {
+            p_academia_slug: academiaDigitada,
+            p_usuario: usuarioDigitado,
+          }
+        );
+
+        if (rpcError) {
+          console.error("Erro RPC buscar_email_login:", rpcError);
+          setErro("Erro ao localizar usuário");
+          return;
+        }
+
+        if (!rpcData || rpcData.length === 0 || !rpcData[0]?.email) {
+          setErro("Academia ou usuário não encontrado");
+          return;
+        }
+
+        emailLogin = String(rpcData[0].email).toLowerCase();
       }
 
-      if (!rpcData || rpcData.length === 0 || !rpcData[0]?.email) {
-        setErro("Academia ou usuário não encontrado");
-        return;
-      }
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email: emailLogin,
+          password: senha,
+        });
 
-      const email = rpcData[0].email;
-
-      const loginResponse = await supabase.auth.signInWithPassword({
-        email,
-        password: senha,
-      });
-
-      if (loginResponse.error) {
-        console.error("Erro login:", loginResponse.error);
+      if (authError) {
+        console.error("Erro login:", authError);
         setErro("Usuário ou senha inválidos");
         return;
       }
 
-      const userId = loginResponse.data?.user?.id;
-
+      const userId = authData?.user?.id;
       if (!userId) {
         setErro("Não foi possível identificar o usuário");
         return;
@@ -121,18 +179,52 @@ export default function Login() {
         return;
       }
 
-      const academiaSelecionada = academias.find((item) => item.slug === a);
-
-      if (academiaSelecionada) {
-        localStorage.setItem("treinoprint_academia_id", academiaSelecionada.id);
-        localStorage.setItem("treinoprint_academia", academiaSelecionada.slug);
-        localStorage.setItem("treinoprint_academia_nome", academiaSelecionada.nome);
-      }
-
-      localStorage.setItem("treinoprint_usuario", u);
+      localStorage.setItem("treinoprint_usuario", profile.usuario || usuarioDigitado);
       localStorage.setItem("treinoprint_user_id", profile.id);
       localStorage.setItem("treinoprint_user_nome", profile.nome || "");
       localStorage.setItem("treinoprint_user_tipo", profile.tipo || "");
+
+      if (profile.tipo === "superadmin") {
+        localStorage.removeItem("treinoprint_academia_id");
+        localStorage.removeItem("treinoprint_academia");
+        localStorage.removeItem("treinoprint_academia_nome");
+        localStorage.removeItem("treinoprint_academia_logo");
+        localStorage.removeItem("treinoprint_permissoes");
+
+        window.dispatchEvent(new Event("treinoprint-academia-updated"));
+        window.dispatchEvent(new Event("treinoprint-permissoes-updated"));
+
+        router.push("/superadmin");
+        return;
+      }
+
+      if (!academiaDigitada) {
+        setErro("Informe a academia");
+        return;
+      }
+
+      const academiaSelecionada = academias.find(
+        (item) => item.slug?.toLowerCase() === academiaDigitada
+      );
+
+      if (!academiaSelecionada) {
+        setErro("Academia não encontrada");
+        return;
+      }
+
+      localStorage.setItem("treinoprint_academia_id", academiaSelecionada.id);
+      localStorage.setItem("treinoprint_academia", academiaSelecionada.slug);
+      localStorage.setItem("treinoprint_academia_nome", academiaSelecionada.nome);
+
+      if (academiaSelecionada.logo_url) {
+        localStorage.setItem("treinoprint_academia_logo", academiaSelecionada.logo_url);
+      } else {
+        localStorage.removeItem("treinoprint_academia_logo");
+      }
+
+      window.dispatchEvent(new Event("treinoprint-academia-updated"));
+
+      await salvarPermissoesUsuario(profile.id, academiaSelecionada.id);
 
       if (profile.tipo === "admin") {
         router.push("/");
@@ -180,33 +272,26 @@ export default function Login() {
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Academia
               </label>
-              <select
+              <input
+                type="text"
+                placeholder="Ex: crisfitness"
                 value={academia}
                 onChange={(e) => setAcademia(e.target.value)}
-                disabled={loadingAcademias || loading}
-                className="w-full border border-gray-300 focus:border-black focus:ring-2 focus:ring-black/10 outline-none p-3 rounded-xl bg-white disabled:bg-gray-100 transition"
-              >
-                <option value="">
-                  {loadingAcademias
-                    ? "Carregando academias..."
-                    : "Selecione a academia"}
-                </option>
-
-                {academias.map((item) => (
-                  <option key={item.id} value={item.slug}>
-                    {item.nome}
-                  </option>
-                ))}
-              </select>
+                disabled={loading || loadingAcademias}
+                className="w-full border border-gray-300 focus:border-black focus:ring-2 focus:ring-black/10 outline-none p-3 rounded-xl transition"
+              />
+              <p className="text-xs text-gray-400 mt-2">
+                Para superadmin, esse campo pode ficar em branco.
+              </p>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Usuário
+                Usuário ou Email
               </label>
               <input
                 type="text"
-                placeholder="Digite seu usuário"
+                placeholder="usuario ou email"
                 value={usuario}
                 onChange={(e) => setUsuario(e.target.value)}
                 disabled={loading}
@@ -226,8 +311,8 @@ export default function Login() {
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                   disabled={loading}
-                  onKeyDown={(e) => e.key === "Enter" && entrar()}
-                  className="w-full border border-gray-300 focus:border-black focus:ring-2 focus:ring-black/10 outline-none p-3 pr-16 rounded-xl transition"
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                  className="w-full border border-gray-300 focus:border-black focus:ring-2 focus:ring-black/10 outline-none p-3 pr-20 rounded-xl transition"
                 />
 
                 <button
@@ -247,8 +332,8 @@ export default function Login() {
             )}
 
             <button
-              onClick={entrar}
-              disabled={loading || loadingAcademias}
+              onClick={handleLogin}
+              disabled={loading}
               className="w-full bg-black hover:bg-gray-900 text-white font-semibold p-3 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition"
             >
               {loading ? "Entrando..." : "Entrar"}

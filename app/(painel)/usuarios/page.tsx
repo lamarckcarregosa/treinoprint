@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
 
 type Usuario = {
   id: string;
@@ -29,6 +31,7 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
   });
 }
 
+
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +46,8 @@ export default function UsuariosPage() {
   const [senha, setSenha] = useState("");
   const [tipo, setTipo] = useState("personal");
   const [ativo, setAtivo] = useState(true);
+
+  const router = useRouter();
 
   const carregarUsuarios = async () => {
     try {
@@ -174,6 +179,13 @@ export default function UsuariosPage() {
           <h2 className="font-semibold">
             {editandoId ? "Editar usuário" : "Novo usuário"}
           </h2>
+        <button
+        onClick={() => router.push("/sistema")}
+        className="bg-black text-white px-5 py-3 rounded-xl hover:bg-gray-800 transition"
+      >
+        Voltar
+      </button>
+    
 
           {editandoId ? (
             <button

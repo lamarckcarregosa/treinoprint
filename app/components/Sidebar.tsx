@@ -2,29 +2,32 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../../lib/supabase";
 import {
   House,
   LayoutDashboard,
   Printer,
+  CreditCard,
   Users,
-  Dumbbell,
-  UserCog,
-  KeyRound,
-  LogOut,
   UserSquare2,
+  Dumbbell,
+  Landmark,
+  Settings2,
+  ShieldCheck,
+  LogOut,
   ChevronLeft,
   ChevronRight,
-  BadgeDollarSign,
-  Wallet2,
+  KeyRound,
+  ArrowLeftRight,
 } from "lucide-react";
-import { motion } from "framer-motion";
-import { supabase } from "../../lib/supabase";
+import { Permissao, PermissoesObjeto, temPermissao } from "@/lib/permissoes";
 
 type MenuItem = {
   href: string;
   label: string;
-  icon: React.ReactNode;
+  icon: any;
+  permissao?: Permissao;
 };
 
 export default function Sidebar() {
@@ -34,22 +37,41 @@ export default function Sidebar() {
   const [nome, setNome] = useState("Usuário");
   const [tipo, setTipo] = useState("");
   const [academia, setAcademia] = useState("");
-  const [logo, setLogo] = useState("");
-  const [collapsed, setCollapsed] = useState(false);
+  const [logoAcademia, setLogoAcademia] = useState("");
+  const [academiaId, setAcademiaId] = useState("");
+  const [fixadoAberto, setFixadoAberto] = useState(false);
+  const [hoverExpandido, setHoverExpandido] = useState(false);
+  const [permissoesCustom, setPermissoesCustom] =
+    useState<Partial<PermissoesObjeto> | null>(null);
 
   useEffect(() => {
-    setNome(localStorage.getItem("treinoprint_user_nome") || "Usuário");
-    setTipo(localStorage.getItem("treinoprint_user_tipo") || "");
-    setAcademia(localStorage.getItem("treinoprint_academia_nome") || "");
-    setLogo(localStorage.getItem("treinoprint_academia_logo") || "");
-    setCollapsed(localStorage.getItem("treinoprint_sidebar_collapsed") === "true");
-  }, []);
+    const carregarDados = () => {
+      setNome(localStorage.getItem("treinoprint_user_nome") || "Usuário");
+      setTipo(localStorage.getItem("treinoprint_user_tipo") || "");
+      setAcademia(localStorage.getItem("treinoprint_academia_nome") || "");
+      setLogoAcademia(localStorage.getItem("treinoprint_academia_logo") || "");
+      setAcademiaId(localStorage.getItem("treinoprint_academia_id") || "");
 
-  const toggleSidebar = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    localStorage.setItem("treinoprint_sidebar_collapsed", String(next));
-  };
+      try {
+        const rawPermissoes = localStorage.getItem("treinoprint_permissoes");
+        setPermissoesCustom(rawPermissoes ? JSON.parse(rawPermissoes) : null);
+      } catch {
+        setPermissoesCustom(null);
+      }
+    };
+
+    carregarDados();
+
+    window.addEventListener("treinoprint-academia-updated", carregarDados);
+    window.addEventListener("treinoprint-permissoes-updated", carregarDados);
+    window.addEventListener("storage", carregarDados);
+
+    return () => {
+      window.removeEventListener("treinoprint-academia-updated", carregarDados);
+      window.removeEventListener("treinoprint-permissoes-updated", carregarDados);
+      window.removeEventListener("storage", carregarDados);
+    };
+  }, []);
 
   const sair = async () => {
     await supabase.auth.signOut();
@@ -57,106 +79,136 @@ export default function Sidebar() {
     router.push("/login");
   };
 
-  const menuAdmin: MenuItem[] = [
-    { href: "/", label: "Início", icon: <House size={18} /> },
-    { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
-    { href: "/imprimir", label: "Imprimir", icon: <Printer size={18} /> },
-    { href: "/pagamentos", label: "Pagamentos", icon: <Wallet2 size={18} /> },
-    { href: "/alunos", label: "Alunos", icon: <Users size={18} /> },
-    { href: "/personals", label: "Personais", icon: <UserSquare2 size={18} /> },
-    { href: "/treinos", label: "Treinos", icon: <Dumbbell size={18} /> },
-    { href: "/usuarios", label: "Usuários", icon: <UserCog size={18} /> },
-    { href: "/financeiro", label: "Financeiro", icon: <BadgeDollarSign size={18} /> },
-    { href: "/usuarios/novasenha", label: "Alterar senha", icon: <KeyRound size={18} /> },
+  const voltarSuperadmin = () => {
+    localStorage.removeItem("treinoprint_academia_id");
+    localStorage.removeItem("treinoprint_academia");
+    localStorage.removeItem("treinoprint_academia_nome");
+    localStorage.removeItem("treinoprint_academia_logo");
+
+    window.dispatchEvent(new Event("treinoprint-academia-updated"));
+
+    router.push("/superadmin");
+  };
+
+  const menuBase: MenuItem[] = [
+    { href: "/", label: "Início", icon: House },
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, permissao: "dashboard" },
+    { href: "/imprimir", label: "Imprimir", icon: Printer, permissao: "imprimir" },
+    { href: "/pagamentos", label: "Pagamentos", icon: CreditCard, permissao: "pagamentos" },
+    { href: "/alunos", label: "Alunos", icon: Users, permissao: "alunos" },
+    { href: "/personals", label: "Personais", icon: UserSquare2, permissao: "personais" },
+    { href: "/treinos", label: "Treinos", icon: Dumbbell, permissao: "treinos" },
+    { href: "/financeiro", label: "Financeiro", icon: Landmark, permissao: "financeiro" },
+    { href: "/sistema", label: "Sistema", icon: Settings2, permissao: "sistema" },
+    { href: "/usuarios/novasenha", label: "Alterar senha", icon: KeyRound, permissao: "alterar_senha" },
   ];
 
-  const menuPersonal: MenuItem[] = [
-    { href: "/alunos", label: "Alunos", icon: <Users size={18} /> },
-    { href: "/imprimir", label: "Imprimir", icon: <Printer size={18} /> },
-    { href: "/treinos", label: "Treinos", icon: <Dumbbell size={18} /> },
-    { href: "/usuarios/novasenha", label: "Alterar senha", icon: <KeyRound size={18} /> },
+  const menuComSuperadmin: MenuItem[] = [
+    ...menuBase,
+    { href: "/superadmin", label: "Super Admin", icon: ShieldCheck, permissao: "superadmin" },
   ];
 
-  const menuRecepcao: MenuItem[] = [
-    { href: "/alunos", label: "Alunos", icon: <Users size={18} /> },
-    { href: "/imprimir", label: "Imprimir", icon: <Printer size={18} /> },
-    { href: "/pagamentos", label: "Pagamentos", icon: <Wallet2 size={18} /> },
-    { href: "/usuarios/novasenha", label: "Alterar senha", icon: <KeyRound size={18} /> },
-  ];
+  const menuFiltrado = useMemo(() => {
+    const origem = tipo === "superadmin" ? menuComSuperadmin : menuBase;
 
-  const menu =
-    tipo === "admin" ? menuAdmin : tipo === "personal" ? menuPersonal : menuRecepcao;
+    return origem.filter((item) => {
+      if (!item.permissao) return true;
+      return temPermissao(tipo, item.permissao, permissoesCustom);
+    });
+  }, [tipo, permissoesCustom]);
+
+  const expandida = fixadoAberto || hoverExpandido;
+  const mostrarVoltarSuperadmin = tipo === "superadmin" && !!academiaId;
 
   return (
-    <motion.aside
-      animate={{ width: collapsed ? 88 : 280 }}
-      transition={{ duration: 0.25 }}
-      className="min-h-screen bg-zinc-950 text-white flex flex-col border-r border-white/10"
+    <aside
+      onMouseEnter={() => setHoverExpandido(true)}
+      onMouseLeave={() => setHoverExpandido(false)}
+      className={`min-h-screen bg-[#0b0f19] text-white flex flex-col border-r border-white/10 transition-all duration-300 ${
+        expandida ? "w-72" : "w-20"
+      }`}
     >
       <div className="p-4 border-b border-white/10">
-        <div className="flex items-center justify-between mb-4">
-          {!collapsed ? (
-            <div className="text-sm font-semibold text-zinc-400">TreinoPrint</div>
-          ) : (
-            <div />
-          )}
-
+        <div className={`flex ${expandida ? "justify-end" : "justify-center"} mb-4`}>
           <button
-            onClick={toggleSidebar}
-            className="rounded-xl bg-white/10 hover:bg-white/20 p-2 transition"
+            onClick={() => setFixadoAberto((v) => !v)}
+            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
           >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            {expandida ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
           </button>
         </div>
 
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center gap-3">
           <img
-            src={logo || "/logo-padrao.png"}
+            src={logoAcademia || "/logo-padrao.png"}
             alt="Logo"
-            className="w-[100px] h-[100px] object-contain drop-shadow-md"
+            className="w-[160px] h-[160px] object-contain rounded-2xl"
           />
 
-          {!collapsed ? (
-            <div className="text-center mt-3">
-              <h1 className="text-xl font-black leading-none">TreinoPrint</h1>
-              <p className="text-sm text-zinc-400 mt-2">{nome}</p>
-              <p className="text-xs text-zinc-500">{academia}</p>
-            </div>
+          {expandida ? (
+            <>
+              <h1 className="text-2xl font-black leading-none text-center">TreinoPrint</h1>
+              <p className="text-sm text-gray-300 text-center">{nome}</p>
+              <p className="text-xs text-gray-500 text-center">{academia}</p>
+              {tipo === "superadmin" ? (
+                <span className="mt-1 text-[10px] px-2 py-1 rounded-full bg-emerald-600 text-white font-semibold">
+                  SUPERADMIN
+                </span>
+              ) : null}
+            </>
           ) : null}
         </div>
       </div>
 
       <nav className="flex-1 p-3 space-y-2">
-        {menu.map((item) => {
-          const ativo = pathname === item.href;
+        {menuFiltrado.map((item) => {
+          const ativo =
+            pathname === item.href || pathname.startsWith(item.href + "/");
+          const Icon = item.icon;
 
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center ${collapsed ? "justify-center" : "gap-3"} rounded-2xl px-4 py-3 transition ${
+              title={item.label}
+              className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
                 ativo
-                  ? "bg-white text-black font-semibold shadow-lg"
-                  : "text-zinc-300 hover:bg-white/10 hover:text-white"
-              }`}
-              title={collapsed ? item.label : ""}
+                  ? "bg-white text-black font-semibold shadow-sm"
+                  : "text-gray-300 hover:bg-white/10 hover:text-white"
+              } ${expandida ? "" : "justify-center px-2"}`}
             >
-              {item.icon}
-              {!collapsed ? <span>{item.label}</span> : null}
+              <Icon size={18} />
+              {expandida ? <span>{item.label}</span> : null}
             </Link>
           );
         })}
+
+        {mostrarVoltarSuperadmin ? (
+          <button
+            onClick={voltarSuperadmin}
+            title="Voltar ao SuperAdmin"
+            className={`w-full flex items-center gap-3 rounded-2xl px-4 py-3 transition bg-emerald-600 hover:bg-emerald-700 text-white ${
+              expandida ? "" : "justify-center px-2"
+            }`}
+          >
+            <ArrowLeftRight size={18} />
+            {expandida ? <span>Voltar ao SuperAdmin</span> : null}
+          </button>
+        ) : null}
       </nav>
 
       <div className="p-3 border-t border-white/10">
         <button
           onClick={sair}
-          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 font-semibold hover:bg-red-700 transition"
+          className={`w-full rounded-2xl bg-red-600 px-4 py-3 font-semibold hover:bg-red-700 transition flex items-center justify-center gap-2 ${
+            expandida ? "" : "px-2"
+          }`}
+          title="Sair"
         >
           <LogOut size={18} />
-          {!collapsed ? <span>Sair</span> : null}
+          {expandida ? <span>Sair</span> : null}
         </button>
       </div>
-    </motion.aside>
+    </aside>
   );
 }

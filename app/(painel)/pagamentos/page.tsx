@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import ProtegePagina from "@/components/ProtegePagina";
 
 type Pagamento = {
   id: number;
@@ -15,20 +16,7 @@ type Pagamento = {
   forma_pagamento?: string | null;
 };
 
-async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
-  const academiaId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("treinoprint_academia_id")
-      : null;
-
-  const headers = new Headers(init?.headers || {});
-  if (academiaId) headers.set("x-academia-id", academiaId);
-
-  return fetch(input, {
-    ...init,
-    headers,
-  });
-}
+import { apiFetch } from "@/lib/apiFetch";
 
 function formatBRL(valor: number | undefined) {
   return Number(valor || 0).toLocaleString("pt-BR", {
@@ -44,7 +32,7 @@ function formatData(data?: string | null) {
   return dt.toLocaleDateString("pt-BR");
 }
 
-export default function PagamentosPage() {
+function PagamentosPageContent() {
   const hoje = new Date();
   const competenciaAtual = hoje.toISOString().slice(0, 7);
 
@@ -77,7 +65,7 @@ export default function PagamentosPage() {
       const json = await res.json().catch(() => []);
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao carregar pagamentos");
+        setErro((json as any).error || "Erro ao carregar pagamentos");
         return;
       }
 
@@ -101,20 +89,20 @@ export default function PagamentosPage() {
   }, [competencia, statusFiltro]);
 
   const gerarPix = async (
-  alunoNome: string,
-  valor: number,
-  competencia: string
-) => {
-  try {
-    setGerandoPix(true);
+    alunoNome: string,
+    valor: number,
+    competencia: string
+  ) => {
+    try {
+      setGerandoPix(true);
 
-    const chavePix = "79996320601";
-    const nome = "TREINOPRINT";
-    const cidade = "POÇO VERDE";
+      const chavePix = "79996320601";
+      const nome = "TREINOPRINT";
+      const cidade = "POCOVERDE";
 
-    const valorFormatado = Number(valor || 0).toFixed(2);
+      const valorFormatado = Number(valor || 0).toFixed(2);
 
-    const payload = `
+      const payload = `
 000201
 26360014BR.GOV.BCB.PIX
 0114${chavePix}
@@ -127,18 +115,18 @@ export default function PagamentosPage() {
 62070503***
 6304
 `
-      .replace(/\s/g, "");
+        .replace(/\s/g, "");
 
-    const qr = await QRCode.toDataURL(payload);
+      const qr = await QRCode.toDataURL(payload);
 
-    setPixQrCode(qr);
-    setPixCopiaECola(payload);
-  } catch (error: any) {
-    alert(error?.message || "Erro ao gerar PIX");
-  } finally {
-    setGerandoPix(false);
-  }
-};
+      setPixQrCode(qr);
+      setPixCopiaECola(payload);
+    } catch (error: any) {
+      alert(error?.message || "Erro ao gerar PIX");
+    } finally {
+      setGerandoPix(false);
+    }
+  };
 
   const confirmarPagamento = async () => {
     if (!pagamentoSelecionado) return;
@@ -162,7 +150,7 @@ export default function PagamentosPage() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        alert(json.error || "Erro ao registrar pagamento");
+        alert((json as any).error || "Erro ao registrar pagamento");
         return;
       }
 
@@ -187,7 +175,7 @@ export default function PagamentosPage() {
     const json = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      alert(json.error || "Erro ao estornar pagamento");
+      alert((json as any).error || "Erro ao estornar pagamento");
       return;
     }
 
@@ -487,5 +475,13 @@ export default function PagamentosPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function PagamentosPage() {
+  return (
+    <ProtegePagina permissao="pagamentos">
+      <PagamentosPageContent />
+    </ProtegePagina>
   );
 }

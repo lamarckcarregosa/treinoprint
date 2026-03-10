@@ -1,27 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "../../../lib/supabase-server";
-import { getAcademiaIdFromRequest } from "../../../lib/getAcademiaIdFromRequest";
+import { protegerApi } from "../../../lib/protegerApi";
 
 export async function GET(req: NextRequest) {
   try {
-    const academiaId = getAcademiaIdFromRequest(req);
+    const auth = await protegerApi(req, "superadmin");
+    if (!auth.ok) return auth.response;
 
-    const { data, error } = await supabaseServer
-      .from("academias")
-      .select("id, nome, slug, logo_url, endereco, cnpj")
-      .eq("id", academiaId)
-      .single();
+    const [
+      academiasRes,
+      alunosRes,
+      usuariosRes,
+      personaisRes,
+    ] = await Promise.all([
+      supabaseServer.from("academias").select("id, plano, ativa", { count: "exact" }),
+      supabaseServer.from("alunos").select("id", { count: "exact", head: true }),
+      supabaseServer.from("profiles").select("id", { count: "exact", head: true }),
+      supabaseServer.from("personals").select("id", { count: "exact", head: true }),
+    ]);
 
-    if (error) {
-      console.error("Erro /api/minha-academia:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (academiasRes.error) {
+      return NextResponse.json({ error: academiasRes.error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    const academias = academiasRes.data || [];
+    const academiasAtivas = academias.filter((a: any) => a.ativa).length;
+    const academiasInativas = academias.filter((a: any) => !a.ativa).length;
+
+    const planosCounter = new Map<string, number>();
+    academias.forEach((item: any) => {
+      const plano = item.plano || "sem plano";
+      planosCounter.set(plano, (planosCounter.get(plano) || 0) + 1);
+    });
+
+    const academiasPorPlano = Array.from(planosCounter.entries()).map(([plano, total]) => ({
+      plano,
+      total,
+    }));
+
+    return NextResponse.json({
+      totalAcademias: academias.length,
+      academiasAtivas,
+      academiasInativas,
+      totalAlunos: alunosRes.count || 0,
+      totalUsuarios: usuariosRes.count || 0,
+      totalPersonais: personaisRes.count || 0,
+      academiasPorPlano,
+      academiasRecentes: [],
+    });
   } catch (error: any) {
-    console.error("Erro /api/minha-academia:", error);
     return NextResponse.json(
-      { error: error.message || "Erro ao buscar academia" },
+      { error: error.message || "Erro ao carregar dashboard superadmin" },
       { status: 400 }
     );
   }

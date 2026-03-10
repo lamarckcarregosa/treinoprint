@@ -1,56 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "../../../../lib/supabase-server";
-import { getAcademiaIdFromRequest } from "../../../../lib/getAcademiaIdFromRequest";
+import { protegerApi } from "../../../../lib/protegerApi";
 
 export async function GET(req: NextRequest) {
   try {
-    const academiaId = getAcademiaIdFromRequest(req);
-    const { searchParams } = new URL(req.url);
+    const auth = await protegerApi(req, "pagamentos");
+    if (!auth.ok) return auth.response;
 
+    const academiaId = auth.academiaId;
+    const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const competencia = searchParams.get("competencia");
 
     let query = supabaseServer
       .from("financeiro_pagamentos")
-      .select(
-        "id, aluno_id, competencia, valor, vencimento, data_pagamento, status, forma_pagamento, academia_id"
-      )
+      .select("id, aluno_id, competencia, valor, vencimento, data_pagamento, status, forma_pagamento")
       .eq("academia_id", academiaId)
       .order("vencimento", { ascending: true });
 
-    if (status) {
-      query = query.eq("status", status);
-    }
+    if (status) query = query.eq("status", status);
+    if (competencia) query = query.eq("competencia", competencia);
 
-    if (competencia) {
-      query = query.eq("competencia", competencia);
-    }
-
-    const { data: pagamentos, error } = await query;
+    const { data, error } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const alunoIds = [...new Set((pagamentos || []).map((p) => p.aluno_id))];
+    const alunoIds = [...new Set((data || []).map((item: any) => item.aluno_id))];
 
-    const { data: alunos, error: alunosError } = await supabaseServer
-      .from("alunos")
-      .select("id, nome")
-      .in("id", alunoIds.length ? alunoIds : [-1]);
+    let alunosMap = new Map<number, string>();
 
-    if (alunosError) {
-      return NextResponse.json({ error: alunosError.message }, { status: 500 });
+    if (alunoIds.length > 0) {
+      const { data: alunos } = await supabaseServer
+        .from("alunos")
+        .select("id, nome")
+        .eq("academia_id", academiaId)
+        .in("id", alunoIds);
+
+      alunosMap = new Map((alunos || []).map((a: any) => [a.id, a.nome]));
     }
 
-    const alunosMap = new Map((alunos || []).map((a) => [a.id, a.nome]));
-
-    const resultado = (pagamentos || []).map((item) => ({
+    const lista = (data || []).map((item: any) => ({
       ...item,
       aluno_nome: alunosMap.get(item.aluno_id) || "Aluno",
     }));
 
-    return NextResponse.json(resultado);
+    return NextResponse.json(lista);
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Erro ao carregar pagamentos" },

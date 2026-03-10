@@ -59,14 +59,20 @@ function formatBRL(valor: number | undefined) {
 
 function formatData(data?: string | null) {
   if (!data) return "-";
-  const dt = new Date(`${data}T00:00:00`);
+
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(data);
+
+  const dt = isDateOnly ? new Date(`${data}T00:00:00`) : new Date(data);
+
   if (Number.isNaN(dt.getTime())) return data;
+
   return dt.toLocaleDateString("pt-BR");
 }
 
 export default function AlunoPage() {
   const params = useParams();
   const router = useRouter();
+  const id = String(params.id);
 
   const [aluno, setAluno] = useState<Aluno | null>(null);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
@@ -92,8 +98,6 @@ export default function AlunoPage() {
     try {
       setLoading(true);
       setErro("");
-
-      const id = String(params.id);
 
       const [resAluno, resPagamentos, resImpressoes] = await Promise.all([
         apiFetch(`/api/alunos/${id}`, { cache: "no-store" }),
@@ -142,65 +146,64 @@ export default function AlunoPage() {
 
   useEffect(() => {
     carregar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id]);
+  }, [id]);
 
   const uploadFoto = async (file: File) => {
-  try {
-    if (!aluno) return;
+    try {
+      if (!aluno) return;
 
-    setEnviandoFoto(true);
+      setEnviandoFoto(true);
 
-    const extensao = file.name.split(".").pop();
-    const nomeArquivo = `aluno-${aluno.id}-${Date.now()}.${extensao}`;
+      const extensao = file.name.split(".").pop() || "jpg";
+      const nomeArquivo = `aluno-${aluno.id}-${Date.now()}.${extensao}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("alunos")
-      .upload(nomeArquivo, file, {
-        upsert: true,
+      const { error: uploadError } = await supabase.storage
+        .from("alunos")
+        .upload(nomeArquivo, file, {
+          upsert: true,
+        });
+
+      if (uploadError) {
+        alert(uploadError.message || "Erro ao enviar foto");
+        return;
+      }
+
+      const { data } = supabase.storage.from("alunos").getPublicUrl(nomeArquivo);
+
+      const urlFoto = data.publicUrl;
+
+      const res = await apiFetch(`/api/alunos/${aluno.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nome,
+          telefone,
+          cpf,
+          endereco,
+          data_nascimento: dataNascimento || null,
+          plano,
+          data_matricula: dataMatricula || null,
+          status,
+          foto_url: urlFoto,
+        }),
       });
 
-    if (uploadError) {
-      alert(uploadError.message || "Erro ao enviar foto");
-      return;
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(json.error || "Erro ao salvar foto no aluno");
+        return;
+      }
+
+      setFotoUrl(urlFoto);
+      await carregar();
+      alert("Foto enviada com sucesso");
+    } finally {
+      setEnviandoFoto(false);
     }
-
-    const { data } = supabase.storage.from("alunos").getPublicUrl(nomeArquivo);
-
-    const urlFoto = data.publicUrl;
-
-    const res = await apiFetch(`/api/alunos/${aluno.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        nome,
-        telefone,
-        cpf,
-        endereco,
-        data_nascimento: dataNascimento || null,
-        plano,
-        data_matricula: dataMatricula || null,
-        status,
-        foto_url: urlFoto,
-      }),
-    });
-
-    const json = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      alert(json.error || "Erro ao salvar foto no aluno");
-      return;
-    }
-
-    setFotoUrl(urlFoto);
-    await carregar();
-    alert("Foto enviada com sucesso");
-  } finally {
-    setEnviandoFoto(false);
-  }
-};
+  };
 
   const salvarAluno = async () => {
     try {
@@ -211,7 +214,7 @@ export default function AlunoPage() {
 
       setSalvandoAluno(true);
 
-      const res = await apiFetch(`/api/alunos/${String(params.id)}`, {
+      const res = await apiFetch(`/api/alunos/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -231,11 +234,11 @@ export default function AlunoPage() {
 
       const json = await res.json().catch(() => ({}));
 
-     if (!res.ok) {
-  console.error("Erro ao atualizar aluno:", json);
-  alert(json.error || JSON.stringify(json) || "Erro ao atualizar aluno");
-  return;
-}
+      if (!res.ok) {
+        console.error("Erro ao atualizar aluno:", json);
+        alert(json.error || JSON.stringify(json) || "Erro ao atualizar aluno");
+        return;
+      }
 
       setEditando(false);
       await carregar();
@@ -246,8 +249,12 @@ export default function AlunoPage() {
   };
 
   const imprimirFicha = () => {
-  router.push(`/alunos/${String(params.id)}/imprimir`);
-};
+    router.push(`/alunos/${id}/imprimir`);
+  };
+
+  const abrirComprovante = (pagamentoId: number) => {
+    window.open(`/financeiro/comprovante/${pagamentoId}`, "_blank");
+  };
 
   const totalPago = useMemo(
     () =>
@@ -305,6 +312,13 @@ export default function AlunoPage() {
 
         <div className="flex flex-wrap gap-3">
           <button
+            onClick={() => router.push(`/alunos/${id}/carteirinha`)}
+            className="bg-emerald-600 text-white px-5 py-3 rounded-xl"
+          >
+            Carteirinha
+          </button>
+
+          <button
             onClick={() => setEditando((v) => !v)}
             className="bg-blue-600 text-white px-5 py-3 rounded-xl"
           >
@@ -345,37 +359,54 @@ export default function AlunoPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 text-sm">
-              <p><strong>Nome:</strong> {aluno.nome}</p>
-              <p><strong>Telefone:</strong> {aluno.telefone || "-"}</p>
-              <p><strong>CPF:</strong> {aluno.cpf || "-"}</p>
-              <p><strong>Plano:</strong> {aluno.plano || "-"}</p>
-              <p><strong>Status:</strong> {aluno.status || "-"}</p>
-              <p><strong>Nascimento:</strong> {formatData(aluno.data_nascimento)}</p>
-              <p><strong>Matrícula:</strong> {formatData(aluno.data_matricula)}</p>
-              <p><strong>Endereço:</strong> {aluno.endereco || "-"}</p>
+              <p>
+                <strong>Nome:</strong> {aluno.nome}
+              </p>
+              <p>
+                <strong>Telefone:</strong> {aluno.telefone || "-"}
+              </p>
+              <p>
+                <strong>CPF:</strong> {aluno.cpf || "-"}
+              </p>
+              <p>
+                <strong>Plano:</strong> {aluno.plano || "-"}
+              </p>
+              <p>
+                <strong>Status:</strong> {aluno.status || "-"}
+              </p>
+              <p>
+                <strong>Nascimento:</strong> {formatData(aluno.data_nascimento)}
+              </p>
+              <p>
+                <strong>Matrícula:</strong> {formatData(aluno.data_matricula)}
+              </p>
+              <p>
+                <strong>Endereço:</strong> {aluno.endereco || "-"}
+              </p>
             </div>
           </div>
         ) : (
           <div className="space-y-4 no-print">
             <h2 className="text-xl font-bold">Editar aluno</h2>
 
-<div className="space-y-2">
-  <label className="block text-sm font-semibold text-gray-600">
-    Upload da foto
-  </label>
-  <input
-    type="file"
-    accept="image/*"
-    onChange={(e) => {
-      const file = e.target.files?.[0];
-      if (file) uploadFoto(file);
-    }}
-    className="border rounded-xl p-3 w-full"
-  />
-  {enviandoFoto ? (
-    <p className="text-sm text-gray-500">Enviando foto...</p>
-  ) : null}
-</div>
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-600">
+                Upload da foto
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadFoto(file);
+                }}
+                className="border rounded-xl p-3 w-full"
+              />
+              {enviandoFoto ? (
+                <p className="text-sm text-gray-500">Enviando foto...</p>
+              ) : null}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <input
                 value={nome}
@@ -495,24 +526,49 @@ export default function AlunoPage() {
                 className="border rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
               >
                 <div>
-                  <p className="font-semibold">Competência: {item.competencia}</p>
+                  <p className="font-semibold">
+                    Competência: {item.competencia}
+                  </p>
                   <p className="text-sm text-gray-600">
                     Vencimento: {formatData(item.vencimento)}
                   </p>
-                  <p className="text-sm text-gray-600">Status: {item.status}</p>
+                  <p className="text-sm text-gray-600">
+                    Status: {item.status}
+                  </p>
+
                   {item.forma_pagamento ? (
                     <p className="text-sm text-blue-600">
                       Forma de pagamento: {item.forma_pagamento}
                     </p>
                   ) : null}
-                </div>
 
-                <div className="text-right">
-                  <p className="font-bold">{formatBRL(item.valor)}</p>
                   {item.data_pagamento ? (
                     <p className="text-sm text-green-600">
                       Pago em: {formatData(item.data_pagamento)}
                     </p>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 md:justify-end">
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      item.status === "pago"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+                    {item.status}
+                  </span>
+
+                  <p className="font-bold">{formatBRL(item.valor)}</p>
+
+                  {item.status === "pago" ? (
+                    <button
+                      onClick={() => abrirComprovante(item.id)}
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-xl"
+                    >
+                      Comprovante
+                    </button>
                   ) : null}
                 </div>
               </div>
@@ -535,7 +591,9 @@ export default function AlunoPage() {
               >
                 <div>
                   <p className="font-semibold">Treino: {item.dia || "-"}</p>
-                  <p className="text-sm text-gray-600">Nível: {item.nivel || "-"}</p>
+                  <p className="text-sm text-gray-600">
+                    Nível: {item.nivel || "-"}
+                  </p>
                   <p className="text-sm text-gray-600">
                     Personal: {item.personal_nome || "-"}
                   </p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ResponsiveContainer,
@@ -17,6 +17,21 @@ import {
   Line,
   Legend,
 } from "recharts";
+import {
+  Users,
+  UserCheck,
+  Dumbbell,
+  CalendarDays,
+  AlertTriangle,
+  Wallet,
+  TrendingUp,
+  CreditCard,
+  ArrowRight,
+  Printer,
+  Landmark,
+  Settings2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 
 type TreinoDia = {
   dia: string;
@@ -34,14 +49,33 @@ type TreinoRecente = {
   dia: string;
 };
 
+type UltimoPagamento = {
+  id: number;
+  aluno: string;
+  valor: number;
+  forma_pagamento?: string | null;
+  data_pagamento?: string | null;
+};
+
+type AlunoVencido = {
+  aluno: string;
+  valor: number;
+  vencimento: string;
+};
+
 type DashboardData = {
   alunosCadastrados: number;
+  alunosAtivos: number;
   treinosHoje: number;
   personalMaisAtivo: string;
   diaMaisUsado: string;
+  mensalidadesEmAberto: number;
+  inadimplentes: number;
   treinosPorDia: TreinoDia[];
   treinosPorNivel: TreinoNivel[];
   treinosRecentes: TreinoRecente[];
+  ultimosPagamentos: UltimoPagamento[];
+  alunosVencidos: AlunoVencido[];
   financeiro: {
     receitaMes: number;
     despesas: number;
@@ -65,41 +99,140 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
 }
 
 function formatBRL(valor: number) {
-  return valor.toLocaleString("pt-BR", {
+  return Number(valor || 0).toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
   });
 }
 
-function AnimatedCard({
+function formatDataHora(data?: string | null) {
+  if (!data) return "-";
+  const dt = new Date(data);
+  if (Number.isNaN(dt.getTime())) return "-";
+  return dt.toLocaleString("pt-BR");
+}
+
+function formatData(data?: string | null) {
+  if (!data) return "-";
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(data);
+  const dt = isDateOnly ? new Date(`${data}T00:00:00`) : new Date(data);
+  if (Number.isNaN(dt.getTime())) return "-";
+  return dt.toLocaleDateString("pt-BR");
+}
+
+function PremiumCard({
   title,
   value,
   subtitle,
-  className = "",
+  icon,
+  valueClassName = "",
 }: {
   title: string;
   value: string | number;
   subtitle?: string;
-  className?: string;
+  icon: React.ReactNode;
+  valueClassName?: string;
 }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className={`bg-white rounded-3xl shadow-sm border border-black/5 p-5 ${className}`}
+      className="bg-white rounded-3xl shadow-sm border border-black/5 p-5 overflow-hidden relative"
     >
-      <p className="text-sm text-zinc-500">{title}</p>
-      <p className="text-2xl md:text-4xl font-black mt-2 break-words">{value}</p>
-      {subtitle ? <p className="text-sm text-zinc-400 mt-2">{subtitle}</p> : null}
+      <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-zinc-100 -mr-8 -mt-8" />
+      <div className="relative flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm text-zinc-500">{title}</p>
+          <p className={`text-2xl md:text-4xl font-black mt-2 break-words ${valueClassName}`}>
+            {value}
+          </p>
+          {subtitle ? <p className="text-sm text-zinc-400 mt-2">{subtitle}</p> : null}
+        </div>
+
+        <div className="w-12 h-12 rounded-2xl bg-black text-white flex items-center justify-center shrink-0">
+          {icon}
+        </div>
+      </div>
     </motion.div>
   );
 }
 
+function SectionCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-3xl shadow-sm border border-black/5 p-5"
+    >
+      <h2 className="font-bold text-lg mb-4">{title}</h2>
+      {children}
+    </motion.div>
+  );
+}
+
+function QuickAction({
+  title,
+  description,
+  icon,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="group w-full text-left rounded-2xl border border-black/5 bg-white px-4 py-3 shadow-sm hover:shadow-md transition"
+    >
+      <div className="flex items-center justify-between gap-3">
+        
+        <div className="flex items-center gap-3">
+          
+          <div className="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center shrink-0">
+            {icon}
+          </div>
+
+          <div className="leading-tight">
+            <p className="font-semibold text-sm text-zinc-900">
+              {title}
+            </p>
+            <p className="text-xs text-zinc-500">
+              {description}
+            </p>
+          </div>
+
+        </div>
+
+        <ArrowRight
+          size={16}
+          className="text-zinc-400 transition group-hover:translate-x-1"
+        />
+      </div>
+    </button>
+  );
+}
+
 export default function DashboardPage() {
+  const router = useRouter();
+
   const [dados, setDados] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [periodo, setPeriodo] = useState("mes");
+
+  const nomeAcademia =
+    typeof window !== "undefined"
+      ? localStorage.getItem("treinoprint_academia_nome") || "sua academia"
+      : "sua academia";
 
   useEffect(() => {
     const carregar = async () => {
@@ -107,8 +240,9 @@ export default function DashboardPage() {
         setLoading(true);
         setErro("");
 
-        const res = await apiFetch("/api/dashboard", { cache: "no-store" });
-        const json = await res.json();
+        const url = `/api/dashboard?periodo=${periodo}`;
+        const res = await apiFetch(url, { cache: "no-store" });
+        const json = await res.json().catch(() => ({}));
 
         if (!res.ok) {
           setErro(json.error || "Erro ao carregar dashboard");
@@ -124,7 +258,36 @@ export default function DashboardPage() {
     };
 
     carregar();
-  }, []);
+  }, [periodo]);
+
+  const pieData = useMemo(
+    () =>
+      (dados?.treinosPorNivel || []).map((item) => ({
+        name: item.nivel,
+        value: item.total,
+      })),
+    [dados]
+  );
+
+  const pieColors = ["#111827", "#374151", "#6B7280", "#9CA3AF"];
+
+  const lucroMes = useMemo(() => {
+    if (!dados) return 0;
+    return Number(dados.financeiro.receitaMes || 0) - Number(dados.financeiro.despesas || 0);
+  }, [dados]);
+
+  const financeiroLinha = useMemo(() => {
+    if (!dados) return [];
+    return [
+      {
+        nome: "Financeiro",
+        receita: dados.financeiro.receitaMes,
+        despesas: dados.financeiro.despesas,
+        equilibrio: dados.financeiro.pontoEquilibrio,
+        lucro: lucroMes,
+      },
+    ];
+  }, [dados, lucroMes]);
 
   if (loading) {
     return <p className="p-6">Carregando dashboard...</p>;
@@ -134,45 +297,119 @@ export default function DashboardPage() {
     return <p className="p-6 text-red-600">{erro || "Erro ao carregar dashboard"}</p>;
   }
 
-  const pieData = dados.treinosPorNivel.map((item) => ({
-    name: item.nivel,
-    value: item.total,
-  }));
-
-  const pieColors = ["#111827", "#374151", "#6B7280", "#9CA3AF"];
-
-  const financeiroLinha = [
-    {
-      nome: "Financeiro",
-      receita: dados.financeiro.receitaMes,
-      despesas: dados.financeiro.despesas,
-      equilibrio: dados.financeiro.pontoEquilibrio,
-    },
-  ];
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl md:text-4xl font-black text-zinc-900">
-          Dashboard TreinoPrint
+      <div className="rounded-3xl bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8">
+        <p className="text-sm text-zinc-300">Painel principal</p>
+        <h1 className="text-3xl md:text-4xl font-black mt-2">
+          Bem-vindo ao Dashboard
         </h1>
-        <p className="text-zinc-500">Visão geral da academia</p>
+        <p className="text-zinc-300 mt-3">
+          Acompanhe a visão geral de {nomeAcademia} em tempo real.
+        </p>
+      </div>
+
+      <SectionCard title="Filtros e atalhos">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-zinc-600 mb-2">
+              Período
+            </label>
+            <select
+              value={periodo}
+              onChange={(e) => setPeriodo(e.target.value)}
+              className="border rounded-2xl p-3 w-full md:w-[280px]"
+            >
+              <option value="hoje">Hoje</option>
+              <option value="semana">Últimos 7 dias</option>
+              <option value="mes">Mês atual</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <QuickAction
+              title="Alunos"
+              description="Gerenciar cadastros e fichas"
+              icon={<Users size={20} />}
+              onClick={() => router.push("/alunos")}
+            />
+            <QuickAction
+              title="Pagamentos"
+              description="Receber mensalidades"
+              icon={<CreditCard size={20} />}
+              onClick={() => router.push("/pagamentos")}
+            />
+            <QuickAction
+              title="Financeiro"
+              description="Despesas e relatórios"
+              icon={<Landmark size={20} />}
+              onClick={() => router.push("/financeiro")}
+            />
+            <QuickAction
+              title="Imprimir treinos"
+              description="Acessar impressão"
+              icon={<Printer size={20} />}
+              onClick={() => router.push("/imprimir")}
+            />
+          </div>
+        </div>
+      </SectionCard>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <PremiumCard
+          title="Alunos cadastrados"
+          value={dados.alunosCadastrados}
+          icon={<Users size={22} />}
+        />
+        <PremiumCard
+          title="Alunos ativos"
+          value={dados.alunosAtivos}
+          icon={<UserCheck size={22} />}
+        />
+        <PremiumCard
+          title="Treinos hoje"
+          value={dados.treinosHoje}
+          icon={<Dumbbell size={22} />}
+        />
+        <PremiumCard
+          title="Dia mais usado"
+          value={dados.diaMaisUsado || "-"}
+          icon={<CalendarDays size={22} />}
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <AnimatedCard title="Alunos cadastrados" value={dados.alunosCadastrados} />
-        <AnimatedCard title="Treinos hoje" value={dados.treinosHoje} />
-        <AnimatedCard title="Personal mais ativo" value={dados.personalMaisAtivo} />
-        <AnimatedCard title="Dia mais usado" value={dados.diaMaisUsado} />
+        <PremiumCard
+          title="Mensalidades em aberto"
+          value={dados.mensalidadesEmAberto}
+          subtitle="Lançamentos pendentes"
+          icon={<CreditCard size={22} />}
+          valueClassName="text-yellow-600"
+        />
+        <PremiumCard
+          title="Inadimplentes"
+          value={dados.inadimplentes}
+          subtitle="Alunos com vencimento em aberto"
+          icon={<AlertTriangle size={22} />}
+          valueClassName="text-red-600"
+        />
+        <PremiumCard
+          title="Receita do período"
+          value={formatBRL(dados.financeiro.receitaMes)}
+          icon={<Wallet size={22} />}
+          valueClassName="text-green-600"
+        />
+        <PremiumCard
+          title="Lucro do período"
+          value={formatBRL(lucroMes)}
+          subtitle="Receita - despesas"
+          icon={<TrendingUp size={22} />}
+          valueClassName={lucroMes >= 0 ? "text-violet-600" : "text-red-600"}
+        />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl shadow-sm border border-black/5 p-5"
-        >
-          <h2 className="font-bold text-lg mb-4">Treinos por dia</h2>
+        <SectionCard title="Treinos por dia">
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dados.treinosPorDia}>
@@ -184,18 +421,13 @@ export default function DashboardPage() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </motion.div>
+        </SectionCard>
 
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl shadow-sm border border-black/5 p-5"
-        >
-          <h2 className="font-bold text-lg mb-4">Treinos por nível</h2>
+        <SectionCard title="Treinos por nível">
           <div className="h-72">
             {pieData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-zinc-500">
-                Sem dados hoje.
+                Sem dados no período.
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -210,21 +442,34 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             )}
           </div>
-        </motion.div>
+        </SectionCard>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-3xl shadow-sm border border-black/5 p-5"
-      >
-        <h2 className="font-bold text-lg mb-4">Financeiro</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-          <AnimatedCard title="Receita do mês" value={formatBRL(dados.financeiro.receitaMes)} />
-          <AnimatedCard title="Despesas" value={formatBRL(dados.financeiro.despesas)} />
-          <AnimatedCard
+      <SectionCard title="Financeiro">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+          <PremiumCard
+            title="Receita"
+            value={formatBRL(dados.financeiro.receitaMes)}
+            icon={<Wallet size={20} />}
+            valueClassName="text-green-600"
+          />
+          <PremiumCard
+            title="Despesas"
+            value={formatBRL(dados.financeiro.despesas)}
+            icon={<AlertTriangle size={20} />}
+            valueClassName="text-red-600"
+          />
+          <PremiumCard
             title="Ponto de equilíbrio"
             value={formatBRL(dados.financeiro.pontoEquilibrio)}
+            icon={<CreditCard size={20} />}
+            valueClassName="text-blue-600"
+          />
+          <PremiumCard
+            title="Lucro estimado"
+            value={formatBRL(lucroMes)}
+            icon={<TrendingUp size={20} />}
+            valueClassName={lucroMes >= 0 ? "text-violet-600" : "text-red-600"}
           />
         </div>
 
@@ -239,18 +484,63 @@ export default function DashboardPage() {
               <Line type="monotone" dataKey="receita" stroke="#16a34a" strokeWidth={3} />
               <Line type="monotone" dataKey="despesas" stroke="#dc2626" strokeWidth={3} />
               <Line type="monotone" dataKey="equilibrio" stroke="#2563eb" strokeWidth={3} />
+              <Line type="monotone" dataKey="lucro" stroke="#7c3aed" strokeWidth={3} />
             </LineChart>
           </ResponsiveContainer>
         </div>
-      </motion.div>
+      </SectionCard>
 
-      <motion.div
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-3xl shadow-sm border border-black/5 p-5"
-      >
-        <h2 className="font-bold text-lg mb-4">Treinos recentes</h2>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <SectionCard title="Últimos pagamentos">
+          {dados.ultimosPagamentos.length === 0 ? (
+            <p className="text-sm text-zinc-500">Nenhum pagamento recente.</p>
+          ) : (
+            <div className="space-y-3">
+              {dados.ultimosPagamentos.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3 flex items-center justify-between gap-3"
+                >
+                  <div>
+                    <p className="font-semibold text-zinc-900">{item.aluno}</p>
+                    <p className="text-sm text-zinc-500">
+                      {item.forma_pagamento || "-"} • {formatDataHora(item.data_pagamento)}
+                    </p>
+                  </div>
 
+                  <p className="font-black text-green-600">{formatBRL(item.valor)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Alunos com vencimento em aberto">
+          {dados.alunosVencidos.length === 0 ? (
+            <p className="text-sm text-zinc-500">Nenhum aluno vencido no momento.</p>
+          ) : (
+            <div className="space-y-3">
+              {dados.alunosVencidos.map((item, index) => (
+                <div
+                  key={`${item.aluno}-${index}`}
+                  className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3 flex items-center justify-between gap-3"
+                >
+                  <div>
+                    <p className="font-semibold text-zinc-900">{item.aluno}</p>
+                    <p className="text-sm text-zinc-500">
+                      Vencimento: {formatData(item.vencimento)}
+                    </p>
+                  </div>
+
+                  <p className="font-black text-yellow-600">{formatBRL(item.valor)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      </div>
+
+      <SectionCard title="Treinos recentes">
         {dados.treinosRecentes.length === 0 ? (
           <p className="text-sm text-zinc-500">Nenhum treino recente.</p>
         ) : (
@@ -267,7 +557,7 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
-      </motion.div>
+      </SectionCard>
     </div>
   );
 }
