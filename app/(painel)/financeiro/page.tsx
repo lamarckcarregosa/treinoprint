@@ -48,6 +48,8 @@ type Despesa = {
   data_lancamento: string;
   observacoes?: string;
   tipo?: string;
+  status?: string;
+  data_pagamento?: string | null;
 };
 
 type Pagamento = {
@@ -110,6 +112,10 @@ function FinanceiroPageContent() {
   const [inadimplentes, setInadimplentes] = useState<InadimplenteAgrupado[]>([]);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
+
+  const [despesaEditandoId, setDespesaEditandoId] = useState<number | null>(null);
+const [salvandoDespesaId, setSalvandoDespesaId] = useState<number | null>(null);
+const [marcandoPagaId, setMarcandoPagaId] = useState<number | null>(null);
 
   const [descricao, setDescricao] = useState("");
   const [categoria, setCategoria] = useState("");
@@ -319,6 +325,9 @@ function FinanceiroPageContent() {
   };
 
   const atualizarDespesa = async (item: Despesa) => {
+  try {
+    setSalvandoDespesaId(item.id);
+
     const res = await apiFetch(`/api/financeiro/despesas/${item.id}`, {
       method: "PUT",
       headers: {
@@ -334,9 +343,34 @@ function FinanceiroPageContent() {
       return;
     }
 
+    setDespesaEditandoId(null);
     alert("Despesa atualizada com sucesso");
     await carregarTudo();
-  };
+  } finally {
+    setSalvandoDespesaId(null);
+  }
+};
+
+const marcarDespesaComoPaga = async (id: number) => {
+  try {
+    setMarcandoPagaId(id);
+
+    const res = await apiFetch(`/api/financeiro/despesas/${id}/marcar-paga`, {
+      method: "POST",
+    });
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      alert(json.error || "Erro ao marcar despesa como paga");
+      return;
+    }
+
+    await carregarTudo();
+  } finally {
+    setMarcandoPagaId(null);
+  }
+};
 
   const excluirDespesa = async (id: number) => {
     const confirmar = confirm("Excluir esta despesa?");
@@ -589,15 +623,15 @@ function FinanceiroPageContent() {
           </button>
 
           <button
-            onClick={() => router.push("/financeiro/despesas-fixas")}
-            className="min-w-[170px] h-[48px] bg-zinc-800 text-white rounded-xl font-medium"
+            onClick={() => router.push("/financeiro/despesas")}
+            className="min-w-[170px] h-[48px] bg-black text-white rounded-xl font-medium"
           >
-            Despesas fixas
+            Cadastro de despesas
           </button>
 
           <button
             onClick={() => router.push("/financeiro/alunos")}
-            className="min-w-[260px] h-[48px] bg-black text-white rounded-xl font-medium"
+            className="min-w-[260px] h-[48px] bg-orange-500 text-white rounded-xl font-medium"
           >
             Mensalidades dos alunos
           </button>
@@ -697,54 +731,6 @@ function FinanceiroPageContent() {
             </LineChart>
           </ResponsiveContainer>
         </div>
-      </section>
-
-      <section className="bg-white rounded-2xl shadow p-6 space-y-4 border border-black/5">
-        <h2 className="font-semibold">Cadastrar despesa</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <input
-            value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
-            placeholder="Descrição"
-            className="border rounded-xl p-3"
-          />
-          <input
-            value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
-            placeholder="Categoria"
-            className="border rounded-xl p-3"
-          />
-          <input
-            type="number"
-            step="0.01"
-            value={valor}
-            onChange={(e) => setValor(e.target.value)}
-            placeholder="Valor"
-            className="border rounded-xl p-3"
-          />
-          <input
-            type="date"
-            value={dataLancamento}
-            onChange={(e) => setDataLancamento(e.target.value)}
-            className="border rounded-xl p-3"
-          />
-        </div>
-
-        <textarea
-          value={observacoes}
-          onChange={(e) => setObservacoes(e.target.value)}
-          placeholder="Observações"
-          className="border rounded-xl p-3 w-full min-h-24"
-        />
-
-        <button
-          onClick={cadastrarDespesa}
-          disabled={salvando}
-          className="bg-black text-white rounded-xl px-5 py-3 disabled:opacity-60"
-        >
-          {salvando ? "Salvando..." : "Cadastrar despesa"}
-        </button>
       </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -884,59 +870,143 @@ function FinanceiroPageContent() {
       </section>
 
       <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
-          <h2 className="font-semibold">Despesas lançadas</h2>
+  <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
+    <h2 className="font-semibold">Despesas lançadas</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full xl:w-auto">
-            <input
-              value={filtroDespesaTexto}
-              onChange={(e) => setFiltroDespesaTexto(e.target.value)}
-              placeholder="Buscar despesa"
-              className="border rounded-xl p-3"
-            />
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full xl:w-auto">
+      <input
+        value={filtroDespesaTexto}
+        onChange={(e) => setFiltroDespesaTexto(e.target.value)}
+        placeholder="Buscar despesa"
+        className="border rounded-xl p-3"
+      />
 
-            <select
-              value={filtroDespesaCategoria}
-              onChange={(e) => setFiltroDespesaCategoria(e.target.value)}
-              className="border rounded-xl p-3"
-            >
-              <option value="">Todas categorias</option>
-              {categoriasDespesas.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+      <select
+        value={filtroDespesaCategoria}
+        onChange={(e) => setFiltroDespesaCategoria(e.target.value)}
+        className="border rounded-xl p-3"
+      >
+        <option value="">Todas categorias</option>
+        {categoriasDespesas.map((cat) => (
+          <option key={cat} value={cat}>
+            {cat}
+          </option>
+        ))}
+      </select>
 
-            <select
-              value={filtroDespesaTipo}
-              onChange={(e) => setFiltroDespesaTipo(e.target.value)}
-              className="border rounded-xl p-3"
-            >
-              <option value="todos">Todos tipos</option>
-              <option value="fixa">Fixa</option>
-              <option value="variavel">Variável</option>
-            </select>
-          </div>
-        </div>
+      <select
+        value={filtroDespesaTipo}
+        onChange={(e) => setFiltroDespesaTipo(e.target.value)}
+        className="border rounded-xl p-3"
+      >
+        <option value="todos">Todos tipos</option>
+        <option value="fixa">Fixa</option>
+        <option value="variavel">Variável</option>
+      </select>
+    </div>
+  </div>
 
-        {despesasFiltradas.length === 0 ? (
-          <p className="text-gray-500">Nenhuma despesa encontrada.</p>
-        ) : (
-          <div className="space-y-3">
-            {despesasFiltradas.map((item) => (
-              <div key={item.id} className="border rounded-2xl p-4 space-y-3">
+  {despesasFiltradas.length === 0 ? (
+    <p className="text-gray-500">Nenhuma despesa encontrada.</p>
+  ) : (
+    <div className="space-y-3">
+      {despesasFiltradas.map((item) => {
+        const editando = despesaEditandoId === item.id;
+        const despesaPaga = item.status === "pago";
+
+        return (
+          <div key={item.id} className="border rounded-2xl p-4 space-y-4">
+            {!editando ? (
+              <>
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="font-bold text-gray-900">{item.descricao}</p>
+                    <p className="text-sm text-gray-600">
+                      Categoria: {item.categoria || "-"}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Tipo: {item.tipo || "variavel"}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Data lançamento: {item.data_lancamento || "-"}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Valor: {formatBRL(item.valor)}
+                    </p>
+                    <p className="text-sm">
+                      Status:{" "}
+                      <span
+                        className={
+                          despesaPaga
+                            ? "text-green-600 font-semibold"
+                            : "text-yellow-600 font-semibold"
+                        }
+                      >
+                        {despesaPaga ? "Paga" : "Pendente"}
+                      </span>
+                    </p>
+                    {item.data_pagamento ? (
+                      <p className="text-sm text-green-600">
+                        Pago em: {item.data_pagamento}
+                      </p>
+                    ) : null}
+                    {item.observacoes ? (
+                      <p className="text-sm text-gray-500">
+                        Observações: {item.observacoes}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => setDespesaEditandoId(item.id)}
+                      className="bg-black text-white px-4 py-2 rounded-xl"
+                    >
+                      Editar
+                    </button>
+
+                    {!despesaPaga ? (
+                      <button
+                        onClick={() => marcarDespesaComoPaga(item.id)}
+                        disabled={marcandoPagaId === item.id}
+                        className="bg-green-600 text-white px-4 py-2 rounded-xl disabled:opacity-60"
+                      >
+                        {marcandoPagaId === item.id
+                          ? "Marcando..."
+                          : "Marcar como paga"}
+                      </button>
+                    ) : null}
+
+                    <button
+                      onClick={() => excluirDespesa(item.id)}
+                      className="bg-red-600 text-white px-4 py-2 rounded-xl"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                   <input
                     value={item.descricao}
-                    onChange={(e) => atualizarCampoDespesa(item.id, "descricao", e.target.value)}
+                    onChange={(e) =>
+                      atualizarCampoDespesa(item.id, "descricao", e.target.value)
+                    }
                     className="border rounded-xl p-2"
+                    placeholder="Descrição"
                   />
+
                   <input
                     value={item.categoria || ""}
-                    onChange={(e) => atualizarCampoDespesa(item.id, "categoria", e.target.value)}
+                    onChange={(e) =>
+                      atualizarCampoDespesa(item.id, "categoria", e.target.value)
+                    }
                     className="border rounded-xl p-2"
+                    placeholder="Categoria"
                   />
+
                   <input
                     type="number"
                     step="0.01"
@@ -945,7 +1015,9 @@ function FinanceiroPageContent() {
                       atualizarCampoDespesa(item.id, "valor", Number(e.target.value))
                     }
                     className="border rounded-xl p-2"
+                    placeholder="Valor"
                   />
+
                   <input
                     type="date"
                     value={item.data_lancamento}
@@ -954,9 +1026,12 @@ function FinanceiroPageContent() {
                     }
                     className="border rounded-xl p-2"
                   />
+
                   <select
                     value={item.tipo || "variavel"}
-                    onChange={(e) => atualizarCampoDespesa(item.id, "tipo", e.target.value)}
+                    onChange={(e) =>
+                      atualizarCampoDespesa(item.id, "tipo", e.target.value)
+                    }
                     className="border rounded-xl p-2"
                   >
                     <option value="variavel">Variável</option>
@@ -973,25 +1048,32 @@ function FinanceiroPageContent() {
                   placeholder="Observações"
                 />
 
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   <button
                     onClick={() => atualizarDespesa(item)}
-                    className="bg-black text-white px-4 py-2 rounded-xl"
+                    disabled={salvandoDespesaId === item.id}
+                    className="bg-black text-white px-4 py-2 rounded-xl disabled:opacity-60"
                   >
-                    Salvar alterações
+                    {salvandoDespesaId === item.id
+                      ? "Salvando..."
+                      : "Salvar alterações"}
                   </button>
+
                   <button
-                    onClick={() => excluirDespesa(item.id)}
-                    className="bg-red-600 text-white px-4 py-2 rounded-xl"
+                    onClick={() => setDespesaEditandoId(null)}
+                    className="border px-4 py-2 rounded-xl"
                   >
-                    Excluir
+                    Cancelar
                   </button>
                 </div>
-              </div>
-            ))}
+              </>
+            )}
           </div>
-        )}
-      </section>
+        );
+      })}
+    </div>
+  )}
+</section>
 
       {pagamentoSelecionado && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">

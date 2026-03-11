@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { apiFetch } from "@/lib/apiFetch";
 
 type Aluno = {
   id: number | string;
@@ -23,24 +24,6 @@ type Exercicio = {
 const diasSemana = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const niveis = ["Iniciante", "Intermediário", "Avançado"];
 const tipos = ["Masculino", "Feminino"];
-
-async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
-  const academiaId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("treinoprint_academia_id")
-      : null;
-
-  const headers = new Headers(init?.headers || {});
-
-  if (academiaId) {
-    headers.set("x-academia-id", academiaId);
-  }
-
-  return fetch(input, {
-    ...init,
-    headers,
-  });
-}
 
 export default function ImprimirPage() {
   const [alunos, setAlunos] = useState<Aluno[]>([]);
@@ -77,15 +60,15 @@ export default function ImprimirPage() {
   const carregarAcademia = async () => {
     try {
       const res = await apiFetch("/api/minha-academia", { cache: "no-store" });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         console.error("Erro ao carregar academia:", json);
         return;
       }
 
-      setLogoAcademia(json.logo_url || "");
-      setNomeAcademia(json.nome || "");
+      setLogoAcademia((json as any).logo_url || "");
+      setNomeAcademia((json as any).nome || "");
     } catch (error) {
       console.error("Erro ao carregar academia:", error);
     }
@@ -98,7 +81,7 @@ export default function ImprimirPage() {
 
       if (!res.ok) {
         console.error("Erro ao carregar alunos:", json);
-        setErroPagina(json.error || "Erro ao carregar alunos");
+        setErroPagina((json as any).error || "Erro ao carregar alunos");
         return;
       }
 
@@ -185,7 +168,7 @@ export default function ImprimirPage() {
         return;
       }
 
-      setMsgTreino(`Treino carregado com sucesso.`);
+      setMsgTreino("Treino carregado com sucesso.");
       setExercicios(Array.isArray(primeiro.exercicios) ? primeiro.exercicios : []);
     } catch (error) {
       console.error("Erro ao buscar treino:", error);
@@ -233,43 +216,44 @@ export default function ImprimirPage() {
   if (erroPagina) {
     return <p className="p-6 text-red-600">{erroPagina}</p>;
   }
-const alunosFiltrados = alunos.filter((a) =>
-  a.nome.toLowerCase().includes(buscaAluno.toLowerCase())
-);
 
-const reimprimirUltimoTreino = async () => {
-  try {
-    setCarregandoUltimo(true);
+  const alunosFiltrados = alunos.filter((a) =>
+    a.nome.toLowerCase().includes(buscaAluno.toLowerCase())
+  );
 
-    const res = await apiFetch("/api/historico-impressoes/ultimo", {
-      cache: "no-store",
-    });
+  const reimprimirUltimoTreino = async () => {
+    try {
+      setCarregandoUltimo(true);
 
-    const json = await res.json().catch(() => ({}));
+      const res = await apiFetch("/api/historico-impressoes/ultimo", {
+        cache: "no-store",
+      });
 
-    if (!res.ok) {
-      alert(json.error || "Nenhum treino anterior encontrado");
-      return;
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert((json as any).error || "Nenhum treino anterior encontrado");
+        return;
+      }
+
+      setAlunoSelecionado((json as any).aluno_nome || "");
+      setPersonalSelecionado((json as any).personal_nome || "");
+      setSemana((json as any).semana || "");
+      setDiaSelecionado((json as any).dia || diasSemana[0]);
+      setNivel((json as any).nivel || niveis[0]);
+      setTipo((json as any).tipo || tipos[0]);
+      setExercicios(Array.isArray((json as any).exercicios) ? (json as any).exercicios : []);
+      setTreinoBanco({
+        id: (json as any).id,
+      });
+      setMsgTreino("Último treino carregado para reimpressão.");
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao buscar último treino impresso");
+    } finally {
+      setCarregandoUltimo(false);
     }
-
-    setAlunoSelecionado(json.aluno_nome || "");
-    setPersonalSelecionado(json.personal_nome || "");
-    setSemana(json.semana || "");
-    setDiaSelecionado(json.dia || diasSemana[0]);
-    setNivel(json.nivel || niveis[0]);
-    setTipo(json.tipo || tipos[0]);
-    setExercicios(Array.isArray(json.exercicios) ? json.exercicios : []);
-    setTreinoBanco({
-      id: json.id,
-    });
-    setMsgTreino("Último treino carregado para reimpressão.");
-  } catch (error) {
-    console.error(error);
-    alert("Erro ao buscar último treino impresso");
-  } finally {
-    setCarregandoUltimo(false);
-  }
-};
+  };
 
   return (
     <div className="space-y-6">
@@ -295,37 +279,37 @@ const reimprimirUltimoTreino = async () => {
             </div>
 
             <div className="md:col-span-2">
-  <label className="text-sm font-semibold text-gray-600">Aluno</label>
+              <label className="text-sm font-semibold text-gray-600">Aluno</label>
 
-  <input
-    value={buscaAluno}
-    onChange={(e) => setBuscaAluno(e.target.value)}
-    placeholder="Buscar aluno..."
-    className="w-full border rounded-xl p-3 mt-1"
-  />
+              <input
+                value={buscaAluno}
+                onChange={(e) => setBuscaAluno(e.target.value)}
+                placeholder="Buscar aluno..."
+                className="w-full border rounded-xl p-3 mt-1"
+              />
 
-  <div className="mt-2 border rounded-xl max-h-44 overflow-auto">
-    {alunosFiltrados.length === 0 ? (
-      <p className="p-3 text-sm text-gray-500">Nenhum aluno encontrado.</p>
-    ) : (
-      alunosFiltrados.map((a) => (
-        <button
-          key={a.id}
-          type="button"
-          onClick={() => {
-            setAlunoSelecionado(a.nome);
-            setBuscaAluno(a.nome);
-          }}
-          className={`w-full text-left px-3 py-2 border-b last:border-b-0 hover:bg-gray-50 ${
-            alunoSelecionado === a.nome ? "bg-blue-50 font-semibold" : ""
-          }`}
-        >
-          {a.nome}
-        </button>
-      ))
-    )}
-  </div>
-</div>
+              <div className="mt-2 border rounded-xl max-h-44 overflow-auto">
+                {alunosFiltrados.length === 0 ? (
+                  <p className="p-3 text-sm text-gray-500">Nenhum aluno encontrado.</p>
+                ) : (
+                  alunosFiltrados.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => {
+                        setAlunoSelecionado(a.nome);
+                        setBuscaAluno(a.nome);
+                      }}
+                      className={`w-full text-left px-3 py-2 border-b last:border-b-0 hover:bg-gray-50 ${
+                        alunoSelecionado === a.nome ? "bg-blue-50 font-semibold" : ""
+                      }`}
+                    >
+                      {a.nome}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
 
             <div className="md:col-span-2">
               <label className="text-sm font-semibold text-gray-600">Personal</label>
@@ -403,7 +387,7 @@ const reimprimirUltimoTreino = async () => {
               </select>
             </div>
 
-            <div className="md:col-span-2 flex items-center gap-2 pt-2">
+            <div className="md:col-span-2 flex items-center gap-2 pt-2 flex-wrap">
               <button
                 type="button"
                 onClick={carregarModelo}
@@ -412,16 +396,15 @@ const reimprimirUltimoTreino = async () => {
               >
                 {carregandoTreino ? "Carregando..." : "Carregar treino do banco"}
               </button>
-              <div className="md:col-span-2 flex items-center gap-2 pt-2">
-  <button
-    type="button"
-    onClick={reimprimirUltimoTreino}
-    disabled={carregandoUltimo}
-    className="bg-gray-800 hover:bg-black disabled:opacity-60 text-white px-4 py-2 rounded-xl"
-  >
-    {carregandoUltimo ? "Carregando..." : "Reimprimir último treino"}
-  </button>
-</div>
+
+              <button
+                type="button"
+                onClick={reimprimirUltimoTreino}
+                disabled={carregandoUltimo}
+                className="bg-gray-800 hover:bg-black disabled:opacity-60 text-white px-4 py-2 rounded-xl"
+              >
+                {carregandoUltimo ? "Carregando..." : "Reimprimir último treino"}
+              </button>
 
               <span className="text-xs">
                 {treinoBanco ? (

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/apiFetch";
 
 type Academia = {
   id: string;
@@ -17,21 +18,6 @@ type Academia = {
   slug?: string;
   ativa?: boolean;
 };
-
-async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
-  const academiaId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("treinoprint_academia_id")
-      : null;
-
-  const headers = new Headers(init?.headers || {});
-  if (academiaId) headers.set("x-academia-id", academiaId);
-
-  return fetch(input, {
-    ...init,
-    headers,
-  });
-}
 
 export default function ConfigAcademiaPage() {
   const [academia, setAcademia] = useState<Academia | null>(null);
@@ -52,11 +38,11 @@ export default function ConfigAcademiaPage() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao carregar academia");
+        setErro((json as any).error || "Erro ao carregar academia");
         return;
       }
 
-      setAcademia(json);
+      setAcademia(json as Academia);
     } catch {
       setErro("Erro ao carregar academia");
     } finally {
@@ -93,14 +79,14 @@ export default function ConfigAcademiaPage() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao salvar academia");
+        setErro((json as any).error || "Erro ao salvar academia");
         return;
       }
 
-      setAcademia(json);
+      setAcademia(json as Academia);
 
-      localStorage.setItem("treinoprint_academia_nome", json.nome || "");
-      localStorage.setItem("treinoprint_academia_logo", json.logo_url || "");
+      localStorage.setItem("treinoprint_academia_nome", (json as any).nome || "");
+      localStorage.setItem("treinoprint_academia_logo", (json as any).logo_url || "");
 
       window.dispatchEvent(new Event("treinoprint-academia-updated"));
 
@@ -164,22 +150,25 @@ export default function ConfigAcademiaPage() {
 
   return (
     <main className="p-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-black text-gray-900">
-          Configurações da academia
-        </h1>
-        <p className="text-gray-500 mt-2">
-          Atualize os dados da sua academia e a logo do sistema
-        </p>
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900">
+            Configurações da academia
+          </h1>
+          <p className="text-gray-500 mt-2">
+            Atualize os dados da sua academia e a logo do sistema
+          </p>
+        </div>
+
+        <button
+          onClick={() => router.push("/sistema")}
+          className="bg-black text-white px-5 py-3 rounded-xl hover:bg-gray-800 transition"
+        >
+          Voltar
+        </button>
       </div>
-          <button
-        onClick={() => router.push("/sistema")}
-        className="bg-black text-white px-5 py-3 rounded-xl hover:bg-gray-800 transition"
-      >
-        Voltar
-      </button>
-    
-          <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
+
+      <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
           <div className="md:col-span-2">
             <label className="block text-sm font-semibold text-gray-600 mb-1">

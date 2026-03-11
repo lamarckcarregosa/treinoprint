@@ -39,7 +39,7 @@ export default function HomePage() {
       <div>
         <h1 className="text-3xl font-black text-gray-900">Início</h1>
         <p className="text-gray-500 mt-2">
-          Bem-vindo, {nome} • Academia {academia}
+          Bem-vindo, {nome} • {academia}
         </p>
       </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import QRCode from "react-qr-code";
+import { apiFetch } from "@/lib/apiFetch";
 
 type Aluno = {
   id: number;
@@ -24,21 +25,6 @@ type Academia = {
   telefone?: string;
   cnpj?: string;
 };
-
-async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
-  const academiaId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("treinoprint_academia_id")
-      : null;
-
-  const headers = new Headers(init?.headers || {});
-  if (academiaId) headers.set("x-academia-id", academiaId);
-
-  return fetch(input, {
-    ...init,
-    headers,
-  });
-}
 
 function formatData(data?: string | null) {
   if (!data) return "-";
@@ -80,17 +66,17 @@ export default function CarteirinhaAlunoPage() {
       const jsonAcademia = await resAcademia.json().catch(() => ({}));
 
       if (!resAluno.ok) {
-        setErro(jsonAluno.error || "Erro ao carregar aluno");
+        setErro((jsonAluno as any).error || "Erro ao carregar aluno");
         return;
       }
 
       if (!resAcademia.ok) {
-        setErro(jsonAcademia.error || "Erro ao carregar academia");
+        setErro((jsonAcademia as any).error || "Erro ao carregar academia");
         return;
       }
 
-      setAluno(jsonAluno);
-      setAcademia(jsonAcademia);
+      setAluno(jsonAluno as Aluno);
+      setAcademia(jsonAcademia as Academia);
     } catch {
       setErro("Erro ao carregar carteirinha");
     } finally {
@@ -219,7 +205,6 @@ export default function CarteirinhaAlunoPage() {
         </div>
 
         <div className="print-area">
-          {/* FRENTE */}
           <section className="card-print bg-white w-[325px] h-[204px] rounded-2xl shadow-lg overflow-hidden border mx-auto">
             <div className="bg-black text-white px-3 py-2 flex items-center gap-2 h-[52px]">
               {academia?.logo_url ? (
@@ -288,7 +273,6 @@ export default function CarteirinhaAlunoPage() {
             </div>
           </section>
 
-          {/* VERSO */}
           <section className="card-print bg-white w-[325px] h-[204px] rounded-2xl shadow-lg overflow-hidden border mt-4 mx-auto">
             <div className="h-full p-3 flex gap-3">
               <div className="w-[98px] shrink-0 flex flex-col items-center justify-center">

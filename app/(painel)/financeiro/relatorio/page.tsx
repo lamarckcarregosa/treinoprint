@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/apiFetch";
 
 type ResumoFinanceiro = {
   receitaMes: number;
@@ -25,7 +26,6 @@ export default function RelatorioPage() {
   useEffect(() => {
     const carregar = async () => {
       try {
-        const academiaId = localStorage.getItem("treinoprint_academia_id");
         const params = new URLSearchParams(window.location.search);
 
         const inicio = params.get("inicio");
@@ -36,23 +36,21 @@ export default function RelatorioPage() {
           return;
         }
 
-        const res = await fetch(
+        const res = await apiFetch(
           `/api/financeiro/resumo?inicio=${inicio}&fim=${fim}`,
           {
-            headers: {
-              "x-academia-id": academiaId || "",
-            },
+            cache: "no-store",
           }
         );
 
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          setErro(json.error || "Erro ao carregar relatório");
+          setErro((json as any).error || "Erro ao carregar relatório");
           return;
         }
 
-        setDados(json);
+        setDados(json as ResumoFinanceiro);
       } catch {
         setErro("Erro ao carregar relatório");
       }
@@ -93,7 +91,8 @@ export default function RelatorioPage() {
             <strong>Saldo:</strong> {formatBRL(dados.saldo)}
           </p>
           <p>
-            <strong>Total de inadimplentes:</strong> {dados.totalInadimplentes || 0}
+            <strong>Total de inadimplentes:</strong>{" "}
+            {dados.totalInadimplentes || 0}
           </p>
         </div>
 

@@ -100,7 +100,6 @@ export default function Sidebar() {
     { href: "/treinos", label: "Treinos", icon: Dumbbell, permissao: "treinos" },
     { href: "/financeiro", label: "Financeiro", icon: Landmark, permissao: "financeiro" },
     { href: "/sistema", label: "Sistema", icon: Settings2, permissao: "sistema" },
-    { href: "/usuarios/novasenha", label: "Alterar senha", icon: KeyRound, permissao: "alterar_senha" },
   ];
 
   const menuComSuperadmin: MenuItem[] = [

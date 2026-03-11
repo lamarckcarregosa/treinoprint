@@ -4,53 +4,35 @@ import { protegerApi } from "../../../lib/protegerApi";
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await protegerApi(req, "superadmin");
+    const auth = await protegerApi(req, "alterar_senha");
     if (!auth.ok) return auth.response;
 
-    const [
-      academiasRes,
-      alunosRes,
-      usuariosRes,
-      personaisRes,
-    ] = await Promise.all([
-      supabaseServer.from("academias").select("id, plano, ativa", { count: "exact" }),
-      supabaseServer.from("alunos").select("id", { count: "exact", head: true }),
-      supabaseServer.from("profiles").select("id", { count: "exact", head: true }),
-      supabaseServer.from("personals").select("id", { count: "exact", head: true }),
-    ]);
+    const academiaId = auth.academiaId;
 
-    if (academiasRes.error) {
-      return NextResponse.json({ error: academiasRes.error.message }, { status: 500 });
+    if (!academiaId) {
+      return NextResponse.json(
+        { error: "Academia não informada" },
+        { status: 400 }
+      );
     }
 
-    const academias = academiasRes.data || [];
-    const academiasAtivas = academias.filter((a: any) => a.ativa).length;
-    const academiasInativas = academias.filter((a: any) => !a.ativa).length;
+    const { data, error } = await supabaseServer
+      .from("academias")
+      .select("id, nome, logo_url, telefone, cnpj")
+      .eq("id", academiaId)
+      .single();
 
-    const planosCounter = new Map<string, number>();
-    academias.forEach((item: any) => {
-      const plano = item.plano || "sem plano";
-      planosCounter.set(plano, (planosCounter.get(plano) || 0) + 1);
-    });
+    if (error || !data) {
+      return NextResponse.json(
+        { error: error?.message || "Academia não encontrada" },
+        { status: 404 }
+      );
+    }
 
-    const academiasPorPlano = Array.from(planosCounter.entries()).map(([plano, total]) => ({
-      plano,
-      total,
-    }));
-
-    return NextResponse.json({
-      totalAcademias: academias.length,
-      academiasAtivas,
-      academiasInativas,
-      totalAlunos: alunosRes.count || 0,
-      totalUsuarios: usuariosRes.count || 0,
-      totalPersonais: personaisRes.count || 0,
-      academiasPorPlano,
-      academiasRecentes: [],
-    });
+    return NextResponse.json(data);
   } catch (error: any) {
     return NextResponse.json(
-      { error: error.message || "Erro ao carregar dashboard superadmin" },
+      { error: error.message || "Erro ao carregar academia" },
       { status: 400 }
     );
   }
