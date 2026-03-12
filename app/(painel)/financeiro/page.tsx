@@ -13,7 +13,11 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { Activity, ArrowRight } from "lucide-react";
 import ProtegePagina from "@/components/ProtegePagina";
+import SystemLoader from "@/components/SystemLoader";
+import SystemError from "@/components/SystemError";
+import { apiFetch } from "@/lib/apiFetch";
 
 type Resumo = {
   receitaMes: number;
@@ -64,9 +68,6 @@ type Pagamento = {
   forma_pagamento?: string | null;
 };
 
-import { apiFetch } from "@/lib/apiFetch";
-
- 
 function formatBRL(valor: number | undefined) {
   return Number(valor || 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -94,6 +95,34 @@ function CardInfo({
   );
 }
 
+function QuickCard({
+  title,
+  description,
+  onClick,
+  disabled = false,
+}: {
+  title: string;
+  description: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="group w-full text-left rounded-2xl border border-black/5 bg-white px-4 py-4 shadow-sm hover:shadow-md transition disabled:opacity-60"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-semibold text-sm text-zinc-900">{title}</p>
+          <p className="text-xs text-zinc-500 mt-1">{description}</p>
+        </div>
+        <ArrowRight size={16} className="text-zinc-400 transition group-hover:translate-x-1" />
+      </div>
+    </button>
+  );
+}
+
 function FinanceiroPageContent() {
   const router = useRouter();
 
@@ -114,8 +143,8 @@ function FinanceiroPageContent() {
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
 
   const [despesaEditandoId, setDespesaEditandoId] = useState<number | null>(null);
-const [salvandoDespesaId, setSalvandoDespesaId] = useState<number | null>(null);
-const [marcandoPagaId, setMarcandoPagaId] = useState<number | null>(null);
+  const [salvandoDespesaId, setSalvandoDespesaId] = useState<number | null>(null);
+  const [marcandoPagaId, setMarcandoPagaId] = useState<number | null>(null);
 
   const [descricao, setDescricao] = useState("");
   const [categoria, setCategoria] = useState("");
@@ -136,7 +165,7 @@ const [marcandoPagaId, setMarcandoPagaId] = useState<number | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [gerandoMensalidades, setGerandoMensalidades] = useState(false);
   const [gerandoDespesasFixas, setGerandoDespesasFixas] = useState(false);
-  const [gerandoTudo, setGerandoTudo] = useState(false);
+  const [gerandoTudoLoading, setGerandoTudoLoading] = useState(false);
   const [erro, setErro] = useState("");
 
   const [pagamentoSelecionado, setPagamentoSelecionado] = useState<Pagamento | null>(null);
@@ -170,26 +199,26 @@ const [marcandoPagaId, setMarcandoPagaId] = useState<number | null>(null);
       const jsonPagamentos = await resPagamentos.json().catch(() => []);
 
       if (!resResumo.ok) {
-        setErro(jsonResumo.error || "Erro ao carregar resumo");
+        setErro((jsonResumo as any).error || "Erro ao carregar resumo");
         return;
       }
 
       if (!resInadimplentes.ok) {
-        setErro(jsonInadimplentes.error || "Erro ao carregar inadimplência");
+        setErro((jsonInadimplentes as any).error || "Erro ao carregar inadimplência");
         return;
       }
 
       if (!resDespesas.ok) {
-        setErro(jsonDespesas.error || "Erro ao carregar despesas");
+        setErro((jsonDespesas as any).error || "Erro ao carregar despesas");
         return;
       }
 
       if (!resPagamentos.ok) {
-        setErro(jsonPagamentos.error || "Erro ao carregar pagamentos");
+        setErro((jsonPagamentos as any).error || "Erro ao carregar pagamentos");
         return;
       }
 
-      setResumo(jsonResumo);
+      setResumo(jsonResumo as Resumo);
       setInadimplentes(Array.isArray(jsonInadimplentes) ? jsonInadimplentes : []);
       setDespesas(Array.isArray(jsonDespesas) ? jsonDespesas : []);
       setPagamentos(Array.isArray(jsonPagamentos) ? jsonPagamentos : []);
@@ -199,20 +228,25 @@ const [marcandoPagaId, setMarcandoPagaId] = useState<number | null>(null);
   };
 
   const gerarPix = async (valor: number) => {
-    const pix = new PixPayload({
-      pixKey: "79996320601",
-      merchantName: "TREINOPRINT",
-      merchantCity: "POÇO VERDE",
-      amount: valor.toFixed(2),
-      message: "Mensalidade Academia",
-    });
+    try {
+      setGerandoPix(true);
 
-    const payload = pix.getPayload();
+      const pix = new PixPayload({
+        pixKey: "79996320601",
+        merchantName: "TREINOPRINT",
+        merchantCity: "POCO VERDE",
+        amount: valor.toFixed(2),
+        message: "Mensalidade Academia",
+      });
 
-    const qr = await QRCode.toDataURL(payload);
+      const payload = pix.getPayload();
+      const qr = await QRCode.toDataURL(payload);
 
-    setPixQrCode(qr);
-    setPixCopiaECola(payload);
+      setPixQrCode(qr);
+      setPixCopiaECola(payload);
+    } finally {
+      setGerandoPix(false);
+    }
   };
 
   useEffect(() => {
@@ -256,7 +290,7 @@ const [marcandoPagaId, setMarcandoPagaId] = useState<number | null>(null);
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao cadastrar despesa");
+        setErro((json as any).error || "Erro ao cadastrar despesa");
         return;
       }
 
@@ -294,12 +328,14 @@ const [marcandoPagaId, setMarcandoPagaId] = useState<number | null>(null);
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        alert(json.error || "Erro ao registrar pagamento");
+        alert((json as any).error || "Erro ao registrar pagamento");
         return;
       }
 
       setPagamentoSelecionado(null);
       setFormaPagamento("pix");
+      setPixQrCode("");
+      setPixCopiaECola("");
       await carregarTudo();
     } finally {
       setSalvandoPagamento(false);
@@ -317,7 +353,7 @@ const [marcandoPagaId, setMarcandoPagaId] = useState<number | null>(null);
     const json = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      alert(json.error || "Erro ao estornar pagamento");
+      alert((json as any).error || "Erro ao estornar pagamento");
       return;
     }
 
@@ -325,52 +361,52 @@ const [marcandoPagaId, setMarcandoPagaId] = useState<number | null>(null);
   };
 
   const atualizarDespesa = async (item: Despesa) => {
-  try {
-    setSalvandoDespesaId(item.id);
+    try {
+      setSalvandoDespesaId(item.id);
 
-    const res = await apiFetch(`/api/financeiro/despesas/${item.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(item),
-    });
+      const res = await apiFetch(`/api/financeiro/despesas/${item.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(item),
+      });
 
-    const json = await res.json().catch(() => ({}));
+      const json = await res.json().catch(() => ({}));
 
-    if (!res.ok) {
-      alert(json.error || "Erro ao atualizar despesa");
-      return;
+      if (!res.ok) {
+        alert((json as any).error || "Erro ao atualizar despesa");
+        return;
+      }
+
+      setDespesaEditandoId(null);
+      alert("Despesa atualizada com sucesso");
+      await carregarTudo();
+    } finally {
+      setSalvandoDespesaId(null);
     }
+  };
 
-    setDespesaEditandoId(null);
-    alert("Despesa atualizada com sucesso");
-    await carregarTudo();
-  } finally {
-    setSalvandoDespesaId(null);
-  }
-};
+  const marcarDespesaComoPaga = async (id: number) => {
+    try {
+      setMarcandoPagaId(id);
 
-const marcarDespesaComoPaga = async (id: number) => {
-  try {
-    setMarcandoPagaId(id);
+      const res = await apiFetch(`/api/financeiro/despesas/${id}/marcar-paga`, {
+        method: "POST",
+      });
 
-    const res = await apiFetch(`/api/financeiro/despesas/${id}/marcar-paga`, {
-      method: "POST",
-    });
+      const json = await res.json().catch(() => ({}));
 
-    const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert((json as any).error || "Erro ao marcar despesa como paga");
+        return;
+      }
 
-    if (!res.ok) {
-      alert(json.error || "Erro ao marcar despesa como paga");
-      return;
+      await carregarTudo();
+    } finally {
+      setMarcandoPagaId(null);
     }
-
-    await carregarTudo();
-  } finally {
-    setMarcandoPagaId(null);
-  }
-};
+  };
 
   const excluirDespesa = async (id: number) => {
     const confirmar = confirm("Excluir esta despesa?");
@@ -383,7 +419,7 @@ const marcarDespesaComoPaga = async (id: number) => {
     const json = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      alert(json.error || "Erro ao excluir despesa");
+      alert((json as any).error || "Erro ao excluir despesa");
       return;
     }
 
@@ -416,11 +452,11 @@ const marcarDespesaComoPaga = async (id: number) => {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao gerar mensalidades");
+        setErro((json as any).error || "Erro ao gerar mensalidades");
         return;
       }
 
-      alert(`Mensalidades geradas: ${json.total || 0}`);
+      alert(`Mensalidades geradas: ${(json as any).total || 0}`);
       await carregarTudo();
     } finally {
       setGerandoMensalidades(false);
@@ -443,11 +479,11 @@ const marcarDespesaComoPaga = async (id: number) => {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao gerar despesas fixas");
+        setErro((json as any).error || "Erro ao gerar despesas fixas");
         return;
       }
 
-      alert(`Despesas fixas geradas: ${json.total || 0}`);
+      alert(`Despesas fixas geradas: ${(json as any).total || 0}`);
       await carregarTudo();
     } finally {
       setGerandoDespesasFixas(false);
@@ -457,7 +493,7 @@ const marcarDespesaComoPaga = async (id: number) => {
   const gerarTudo = async () => {
     try {
       setErro("");
-      setGerandoTudo(true);
+      setGerandoTudoLoading(true);
 
       const res = await apiFetch("/api/financeiro/gerar-tudo", {
         method: "POST",
@@ -470,16 +506,16 @@ const marcarDespesaComoPaga = async (id: number) => {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao gerar tudo");
+        setErro((json as any).error || "Erro ao gerar tudo");
         return;
       }
 
       alert(
-        `Mensalidades geradas: ${json.mensalidades_geradas || 0}\nDespesas fixas geradas: ${json.despesas_fixas_geradas || 0}`
+        `Mensalidades geradas: ${(json as any).mensalidades_geradas || 0}\nDespesas fixas geradas: ${(json as any).despesas_fixas_geradas || 0}`
       );
       await carregarTudo();
     } finally {
-      setGerandoTudo(false);
+      setGerandoTudoLoading(false);
     }
   };
 
@@ -497,7 +533,7 @@ const marcarDespesaComoPaga = async (id: number) => {
 
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
-      alert(json.error || "Erro ao exportar Excel");
+      alert((json as any).error || "Erro ao exportar Excel");
       return;
     }
 
@@ -593,57 +629,92 @@ const marcarDespesaComoPaga = async (id: number) => {
       : "Nenhuma inadimplência no momento.";
 
   if (loading) {
-    return <p className="p-6">Carregando financeiro...</p>;
+    return (
+      <SystemLoader
+        titulo="TreinoPrint"
+        subtitulo="Carregando financeiro..."
+      />
+    );
+  }
+
+  if (erro && !resumo && inadimplentes.length === 0 && despesas.length === 0) {
+    return (
+      <SystemError
+        titulo="Erro ao carregar financeiro"
+        mensagem={erro || "Não foi possível carregar a página."}
+        onTentarNovamente={() => window.location.reload()}
+      />
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+      <section className="rounded-[32px] bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8 overflow-hidden relative">
+        <div className="absolute -right-10 -top-10 w-72 h-72 bg-[#7CFC00]/10 blur-3xl rounded-full" />
+
+        <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+          <div>
+            <p className="text-sm text-zinc-300">Painel principal</p>
+            <h1 className="text-3xl md:text-4xl font-black mt-2">
+              Bem-vindo ao Financeiro
+            </h1>
+            <p className="text-zinc-300 mt-3 max-w-2xl">
+              Controle inadimplência, pagamentos, despesas e mensalidades da academia.
+            </p>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
+            <p className="text-white/60 text-xs">Status do sistema</p>
+            <p className="text-xl font-black mt-1">TreinoPrint Online</p>
+            <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
+              <Activity size={16} />
+              Sistema online
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-900">Financeiro</h1>
-          <p className="text-gray-500 mt-2">
-            Controle de inadimplência, pagamentos, despesas e mensalidades
+          <h2 className="text-xl font-bold text-gray-900">Acessos rápidos</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Atalhos rápidos do módulo financeiro
           </p>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-3 flex-wrap">
-          <button
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 w-full">
+          <QuickCard
+            title={gerandoTudoLoading ? "Gerando..." : "Gerar tudo"}
+            description="Gera mensalidades e despesas fixas"
             onClick={gerarTudo}
-            disabled={gerandoTudo}
-            className="min-w-[170px] h-[48px] bg-emerald-600 text-white rounded-xl font-medium disabled:opacity-60"
-          >
-            {gerandoTudo ? "Gerando..." : "Gerar tudo"}
-          </button>
+            disabled={gerandoTudoLoading}
+          />
 
-          <button
+          <QuickCard
+            title="Fluxo de caixa"
+            description="Entradas e saídas do período"
             onClick={() => router.push("/financeiro/fluxo-caixa")}
-            className="min-w-[170px] h-[48px] bg-zinc-700 text-white rounded-xl font-medium"
-          >
-            Fluxo de caixa
-          </button>
+          />
 
-          <button
+          <QuickCard
+            title="Cadastro de despesas"
+            description="Gerencie despesas fixas e variáveis"
             onClick={() => router.push("/financeiro/despesas")}
-            className="min-w-[170px] h-[48px] bg-black text-white rounded-xl font-medium"
-          >
-            Cadastro de despesas
-          </button>
+          />
 
-          <button
+          <QuickCard
+            title="Mensalidades dos alunos"
+            description="Consulta e controle das cobranças"
             onClick={() => router.push("/financeiro/alunos")}
-            className="min-w-[260px] h-[48px] bg-orange-500 text-white rounded-xl font-medium"
-          >
-            Mensalidades dos alunos
-          </button>
+          />
 
-          <button
+          <QuickCard
+            title="Dashboard financeiro"
+            description="Indicadores e visão geral"
             onClick={() => router.push("/financeiro/dashboard")}
-            className="min-w-[170px] h-[48px] bg-blue-600 text-white rounded-xl font-medium"
-          >
-            Dashboard financeiro
-          </button>
+          />
         </div>
-      </div>
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <input
@@ -827,7 +898,7 @@ const marcarDespesaComoPaga = async (id: number) => {
                           {formatBRL(parcela.valor)}
                         </span>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             setPagamentoSelecionado({
                               id: parcela.id,
                               aluno_id: item.aluno_id,
@@ -838,6 +909,7 @@ const marcarDespesaComoPaga = async (id: number) => {
                               status: "pendente",
                             });
                             setFormaPagamento("pix");
+                            await gerarPix(parcela.valor);
                           }}
                           className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2"
                         >
@@ -870,210 +942,208 @@ const marcarDespesaComoPaga = async (id: number) => {
       </section>
 
       <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-  <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
-    <h2 className="font-semibold">Despesas lançadas</h2>
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
+          <h2 className="font-semibold">Despesas lançadas</h2>
 
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full xl:w-auto">
-      <input
-        value={filtroDespesaTexto}
-        onChange={(e) => setFiltroDespesaTexto(e.target.value)}
-        placeholder="Buscar despesa"
-        className="border rounded-xl p-3"
-      />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full xl:w-auto">
+            <input
+              value={filtroDespesaTexto}
+              onChange={(e) => setFiltroDespesaTexto(e.target.value)}
+              placeholder="Buscar despesa"
+              className="border rounded-xl p-3"
+            />
 
-      <select
-        value={filtroDespesaCategoria}
-        onChange={(e) => setFiltroDespesaCategoria(e.target.value)}
-        className="border rounded-xl p-3"
-      >
-        <option value="">Todas categorias</option>
-        {categoriasDespesas.map((cat) => (
-          <option key={cat} value={cat}>
-            {cat}
-          </option>
-        ))}
-      </select>
+            <select
+              value={filtroDespesaCategoria}
+              onChange={(e) => setFiltroDespesaCategoria(e.target.value)}
+              className="border rounded-xl p-3"
+            >
+              <option value="">Todas categorias</option>
+              {categoriasDespesas.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
 
-      <select
-        value={filtroDespesaTipo}
-        onChange={(e) => setFiltroDespesaTipo(e.target.value)}
-        className="border rounded-xl p-3"
-      >
-        <option value="todos">Todos tipos</option>
-        <option value="fixa">Fixa</option>
-        <option value="variavel">Variável</option>
-      </select>
-    </div>
-  </div>
-
-  {despesasFiltradas.length === 0 ? (
-    <p className="text-gray-500">Nenhuma despesa encontrada.</p>
-  ) : (
-    <div className="space-y-3">
-      {despesasFiltradas.map((item) => {
-        const editando = despesaEditandoId === item.id;
-        const despesaPaga = item.status === "pago";
-
-        return (
-          <div key={item.id} className="border rounded-2xl p-4 space-y-4">
-            {!editando ? (
-              <>
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                  <div className="space-y-1">
-                    <p className="font-bold text-gray-900">{item.descricao}</p>
-                    <p className="text-sm text-gray-600">
-                      Categoria: {item.categoria || "-"}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Tipo: {item.tipo || "variavel"}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Data lançamento: {item.data_lancamento || "-"}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Valor: {formatBRL(item.valor)}
-                    </p>
-                    <p className="text-sm">
-                      Status:{" "}
-                      <span
-                        className={
-                          despesaPaga
-                            ? "text-green-600 font-semibold"
-                            : "text-yellow-600 font-semibold"
-                        }
-                      >
-                        {despesaPaga ? "Paga" : "Pendente"}
-                      </span>
-                    </p>
-                    {item.data_pagamento ? (
-                      <p className="text-sm text-green-600">
-                        Pago em: {item.data_pagamento}
-                      </p>
-                    ) : null}
-                    {item.observacoes ? (
-                      <p className="text-sm text-gray-500">
-                        Observações: {item.observacoes}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      onClick={() => setDespesaEditandoId(item.id)}
-                      className="bg-black text-white px-4 py-2 rounded-xl"
-                    >
-                      Editar
-                    </button>
-
-                    {!despesaPaga ? (
-                      <button
-                        onClick={() => marcarDespesaComoPaga(item.id)}
-                        disabled={marcandoPagaId === item.id}
-                        className="bg-green-600 text-white px-4 py-2 rounded-xl disabled:opacity-60"
-                      >
-                        {marcandoPagaId === item.id
-                          ? "Marcando..."
-                          : "Marcar como paga"}
-                      </button>
-                    ) : null}
-
-                    <button
-                      onClick={() => excluirDespesa(item.id)}
-                      className="bg-red-600 text-white px-4 py-2 rounded-xl"
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                  <input
-                    value={item.descricao}
-                    onChange={(e) =>
-                      atualizarCampoDespesa(item.id, "descricao", e.target.value)
-                    }
-                    className="border rounded-xl p-2"
-                    placeholder="Descrição"
-                  />
-
-                  <input
-                    value={item.categoria || ""}
-                    onChange={(e) =>
-                      atualizarCampoDespesa(item.id, "categoria", e.target.value)
-                    }
-                    className="border rounded-xl p-2"
-                    placeholder="Categoria"
-                  />
-
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={item.valor}
-                    onChange={(e) =>
-                      atualizarCampoDespesa(item.id, "valor", Number(e.target.value))
-                    }
-                    className="border rounded-xl p-2"
-                    placeholder="Valor"
-                  />
-
-                  <input
-                    type="date"
-                    value={item.data_lancamento}
-                    onChange={(e) =>
-                      atualizarCampoDespesa(item.id, "data_lancamento", e.target.value)
-                    }
-                    className="border rounded-xl p-2"
-                  />
-
-                  <select
-                    value={item.tipo || "variavel"}
-                    onChange={(e) =>
-                      atualizarCampoDespesa(item.id, "tipo", e.target.value)
-                    }
-                    className="border rounded-xl p-2"
-                  >
-                    <option value="variavel">Variável</option>
-                    <option value="fixa">Fixa</option>
-                  </select>
-                </div>
-
-                <textarea
-                  value={item.observacoes || ""}
-                  onChange={(e) =>
-                    atualizarCampoDespesa(item.id, "observacoes", e.target.value)
-                  }
-                  className="border rounded-xl p-2 w-full min-h-20"
-                  placeholder="Observações"
-                />
-
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    onClick={() => atualizarDespesa(item)}
-                    disabled={salvandoDespesaId === item.id}
-                    className="bg-black text-white px-4 py-2 rounded-xl disabled:opacity-60"
-                  >
-                    {salvandoDespesaId === item.id
-                      ? "Salvando..."
-                      : "Salvar alterações"}
-                  </button>
-
-                  <button
-                    onClick={() => setDespesaEditandoId(null)}
-                    className="border px-4 py-2 rounded-xl"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </>
-            )}
+            <select
+              value={filtroDespesaTipo}
+              onChange={(e) => setFiltroDespesaTipo(e.target.value)}
+              className="border rounded-xl p-3"
+            >
+              <option value="todos">Todos tipos</option>
+              <option value="fixa">Fixa</option>
+              <option value="variavel">Variável</option>
+            </select>
           </div>
-        );
-      })}
-    </div>
-  )}
-</section>
+        </div>
+
+        {despesasFiltradas.length === 0 ? (
+          <p className="text-gray-500">Nenhuma despesa encontrada.</p>
+        ) : (
+          <div className="space-y-3">
+            {despesasFiltradas.map((item) => {
+              const editando = despesaEditandoId === item.id;
+              const despesaPaga = item.status === "pago";
+
+              return (
+                <div key={item.id} className="border rounded-2xl p-4 space-y-4">
+                  {!editando ? (
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                      <div className="space-y-1">
+                        <p className="font-bold text-gray-900">{item.descricao}</p>
+                        <p className="text-sm text-gray-600">
+                          Categoria: {item.categoria || "-"}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Tipo: {item.tipo || "variavel"}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Data lançamento: {item.data_lancamento || "-"}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Valor: {formatBRL(item.valor)}
+                        </p>
+                        <p className="text-sm">
+                          Status:{" "}
+                          <span
+                            className={
+                              despesaPaga
+                                ? "text-green-600 font-semibold"
+                                : "text-yellow-600 font-semibold"
+                            }
+                          >
+                            {despesaPaga ? "Paga" : "Pendente"}
+                          </span>
+                        </p>
+                        {item.data_pagamento ? (
+                          <p className="text-sm text-green-600">
+                            Pago em: {item.data_pagamento}
+                          </p>
+                        ) : null}
+                        {item.observacoes ? (
+                          <p className="text-sm text-gray-500">
+                            Observações: {item.observacoes}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          onClick={() => setDespesaEditandoId(item.id)}
+                          className="bg-black text-white px-4 py-2 rounded-xl"
+                        >
+                          Editar
+                        </button>
+
+                        {!despesaPaga ? (
+                          <button
+                            onClick={() => marcarDespesaComoPaga(item.id)}
+                            disabled={marcandoPagaId === item.id}
+                            className="bg-green-600 text-white px-4 py-2 rounded-xl disabled:opacity-60"
+                          >
+                            {marcandoPagaId === item.id
+                              ? "Marcando..."
+                              : "Marcar como paga"}
+                          </button>
+                        ) : null}
+
+                        <button
+                          onClick={() => excluirDespesa(item.id)}
+                          className="bg-red-600 text-white px-4 py-2 rounded-xl"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                        <input
+                          value={item.descricao}
+                          onChange={(e) =>
+                            atualizarCampoDespesa(item.id, "descricao", e.target.value)
+                          }
+                          className="border rounded-xl p-2"
+                          placeholder="Descrição"
+                        />
+
+                        <input
+                          value={item.categoria || ""}
+                          onChange={(e) =>
+                            atualizarCampoDespesa(item.id, "categoria", e.target.value)
+                          }
+                          className="border rounded-xl p-2"
+                          placeholder="Categoria"
+                        />
+
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={item.valor}
+                          onChange={(e) =>
+                            atualizarCampoDespesa(item.id, "valor", Number(e.target.value))
+                          }
+                          className="border rounded-xl p-2"
+                          placeholder="Valor"
+                        />
+
+                        <input
+                          type="date"
+                          value={item.data_lancamento}
+                          onChange={(e) =>
+                            atualizarCampoDespesa(item.id, "data_lancamento", e.target.value)
+                          }
+                          className="border rounded-xl p-2"
+                        />
+
+                        <select
+                          value={item.tipo || "variavel"}
+                          onChange={(e) =>
+                            atualizarCampoDespesa(item.id, "tipo", e.target.value)
+                          }
+                          className="border rounded-xl p-2"
+                        >
+                          <option value="variavel">Variável</option>
+                          <option value="fixa">Fixa</option>
+                        </select>
+                      </div>
+
+                      <textarea
+                        value={item.observacoes || ""}
+                        onChange={(e) =>
+                          atualizarCampoDespesa(item.id, "observacoes", e.target.value)
+                        }
+                        className="border rounded-xl p-2 w-full min-h-20"
+                        placeholder="Observações"
+                      />
+
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          onClick={() => atualizarDespesa(item)}
+                          disabled={salvandoDespesaId === item.id}
+                          className="bg-black text-white px-4 py-2 rounded-xl disabled:opacity-60"
+                        >
+                          {salvandoDespesaId === item.id
+                            ? "Salvando..."
+                            : "Salvar alterações"}
+                        </button>
+
+                        <button
+                          onClick={() => setDespesaEditandoId(null)}
+                          className="border px-4 py-2 rounded-xl"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {pagamentoSelecionado && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
@@ -1092,7 +1162,10 @@ const marcarDespesaComoPaga = async (id: number) => {
 
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => setFormaPagamento("pix")}
+                onClick={async () => {
+                  setFormaPagamento("pix");
+                  await gerarPix(pagamentoSelecionado.valor);
+                }}
                 className={`rounded-xl py-3 border font-medium ${
                   formaPagamento === "pix"
                     ? "bg-green-600 text-white border-green-600"
@@ -1136,6 +1209,47 @@ const marcarDespesaComoPaga = async (id: number) => {
               </button>
             </div>
 
+            {formaPagamento === "pix" ? (
+              <div className="space-y-3 border rounded-2xl p-4 bg-gray-50">
+                <p className="text-sm font-semibold text-center">
+                  Pagamento via PIX
+                </p>
+
+                {gerandoPix ? (
+                  <p className="text-sm text-gray-500 text-center">
+                    Gerando QR Code...
+                  </p>
+                ) : pixQrCode ? (
+                  <>
+                    <div className="flex justify-center">
+                      <img
+                        src={pixQrCode}
+                        alt="QR Code Pix"
+                        className="w-52 h-52"
+                      />
+                    </div>
+
+                    <textarea
+                      value={pixCopiaECola}
+                      readOnly
+                      className="w-full border rounded-xl p-3 text-sm min-h-28"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(pixCopiaECola);
+                        alert("Código PIX copiado");
+                      }}
+                      className="w-full border rounded-xl py-3"
+                    >
+                      Copiar código PIX
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="flex gap-3">
               <button
                 onClick={confirmarPagamento}
@@ -1149,6 +1263,8 @@ const marcarDespesaComoPaga = async (id: number) => {
                 onClick={() => {
                   setPagamentoSelecionado(null);
                   setFormaPagamento("pix");
+                  setPixQrCode("");
+                  setPixCopiaECola("");
                 }}
                 className="flex-1 border rounded-xl py-3"
               >

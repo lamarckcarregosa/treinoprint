@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { Eye, EyeOff, LogIn, Building2, User, Lock } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -49,11 +50,11 @@ export default function Login() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao carregar academias");
+        setErro((json as any).error || "Erro ao carregar academias");
         return;
       }
 
-      const lista = json.academias || [];
+      const lista = (json as any).academias || [];
       setAcademias(lista);
 
       if (academiaSalva) {
@@ -99,6 +100,30 @@ export default function Login() {
     } catch {
       localStorage.removeItem("treinoprint_permissoes");
       window.dispatchEvent(new Event("treinoprint-permissoes-updated"));
+    }
+  };
+
+  const carregarDadosAcademia = async (academiaId: string) => {
+    try {
+      const res = await fetch("/api/minha-academia", {
+        headers: {
+          "x-academia-id": academiaId,
+        },
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        return;
+      }
+
+      localStorage.setItem("treinoprint_academia_nome", (json as any).nome || "");
+      localStorage.setItem("treinoprint_academia_logo", (json as any).logo_url || "");
+
+      window.dispatchEvent(new Event("treinoprint-academia-updated"));
+    } catch (error) {
+      console.error("Erro ao carregar dados da academia:", error);
     }
   };
 
@@ -214,9 +239,9 @@ export default function Login() {
 
       localStorage.setItem("treinoprint_academia_id", academiaSelecionada.id);
       localStorage.setItem("treinoprint_academia", academiaSelecionada.slug);
-      localStorage.setItem("treinoprint_academia_nome", academiaSelecionada.nome);
+      localStorage.setItem("treinoprint_academia_nome", academiaSelecionada.nome || "");
 
-      if (academiaSelecionada.logo_url) {
+      if (academiaSelecionada.logo_url && academiaSelecionada.logo_url.trim() !== "") {
         localStorage.setItem("treinoprint_academia_logo", academiaSelecionada.logo_url);
       } else {
         localStorage.removeItem("treinoprint_academia_logo");
@@ -225,16 +250,9 @@ export default function Login() {
       window.dispatchEvent(new Event("treinoprint-academia-updated"));
 
       await salvarPermissoesUsuario(profile.id, academiaSelecionada.id);
+      await carregarDadosAcademia(academiaSelecionada.id);
 
-      if (profile.tipo === "admin") {
-        router.push("/");
-      } else if (profile.tipo === "personal") {
-        router.push("/treinos");
-      } else if (profile.tipo === "recepcao") {
-        router.push("/alunos");
-      } else {
-        router.push("/");
-      }
+      router.push("/");
     } catch (err) {
       console.error("Erro inesperado no login:", err);
       setErro("Erro inesperado ao entrar");
@@ -244,107 +262,179 @@ export default function Login() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-zinc-100 via-gray-100 to-zinc-200 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white/95 backdrop-blur rounded-3xl shadow-2xl border border-gray-200 p-8">
-          <div className="flex flex-col items-center text-center mb-8">
-            <div className="mb-4 rounded-2xl bg-black p-3 shadow-lg">
+    <main className="min-h-screen bg-[#05070b] relative overflow-hidden">
+      <div className="absolute inset-0">
+        <div className="absolute -top-32 -left-20 w-[380px] h-[380px] rounded-full bg-[#7CFC00]/10 blur-3xl" />
+        <div className="absolute top-1/3 -right-24 w-[420px] h-[420px] rounded-full bg-[#7CFC00]/10 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(124,252,0,0.08),transparent_35%)]" />
+      </div>
+
+      <div className="relative min-h-screen grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr]">
+        <section className="hidden lg:flex flex-col justify-center px-12 xl:px-20 text-white">
+          <div className="max-w-xl">
+            <Image
+              src="/logo-sistemas.png"
+              alt="TreinoPrint"
+              width={320}
+              height={140}
+              priority
+              className="w-[300px] xl:w-[320px] h-auto object-contain"
+            />
+
+            <h1 className="mt-1 text-5xl font-black leading-tight">
+              Gestão inteligente
+              <span className="text-[#7CFC00]"> para academias</span>
+            </h1>
+
+            <p className="mt-3 text-white/75 text-lg leading-relaxed max-w-lg">
+              Controle alunos, treinos, pagamentos, impressões e acesso em um
+              sistema moderno, rápido e preparado para a rotina da sua academia.
+            </p>
+
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-xl">
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                <p className="text-[#7CFC00] text-2xl font-black">01</p>
+                <p className="text-sm text-white/70 mt-2">
+                  Treinos impressos com agilidade
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                <p className="text-[#7CFC00] text-2xl font-black">02</p>
+                <p className="text-sm text-white/70 mt-2">
+                  Controle financeiro integrado
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                <p className="text-[#7CFC00] text-2xl font-black">03</p>
+                <p className="text-sm text-white/70 mt-2">
+                  Catraca e recepção mais rápidas
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="flex items-center justify-center px-5 py-10 sm:px-8">
+          <div className="w-full max-w-md">
+            <div className="lg:hidden mb-8 text-center">
               <Image
                 src="/logo-sistema.png"
                 alt="TreinoPrint"
-                width={72}
-                height={72}
+                width={260}
+                height={120}
                 priority
-                className="rounded-lg"
+                className="w-64 max-w-full mx-auto h-auto object-contain"
               />
             </div>
 
-            <h1 className="text-3xl font-black tracking-tight text-gray-900">
-              TreinoPrint
-            </h1>
-            <p className="text-sm text-gray-500 mt-2">
-              Acesse sua conta para gerenciar treinos e alunos
-            </p>
-          </div>
+            <div className="rounded-[32px] border border-white/10 bg-white shadow-2xl p-6 sm:p-8">
+              <div className="text-center">
+                <h2 className="text-3xl font-black text-gray-900">Entrar</h2>
+                <p className="text-gray-500 mt-2">
+                  Acesse sua conta para gerenciar sua academia
+                </p>
+              </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Academia
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: crisfitness"
-                value={academia}
-                onChange={(e) => setAcademia(e.target.value)}
-                disabled={loading || loadingAcademias}
-                className="w-full border border-gray-300 focus:border-black focus:ring-2 focus:ring-black/10 outline-none p-3 rounded-xl transition"
-              />
-              <p className="text-xs text-gray-400 mt-2">
-                Para superadmin, esse campo pode ficar em branco.
-              </p>
-            </div>
+              <div className="mt-8 space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Academia
+                  </label>
+                  <div className="relative">
+                    <Building2
+                      size={18}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Ex: crisfitness"
+                      value={academia}
+                      onChange={(e) => setAcademia(e.target.value)}
+                      disabled={loading || loadingAcademias}
+                      className="w-full h-14 rounded-2xl border border-gray-300 pl-11 pr-4 outline-none focus:border-[#7CFC00] focus:ring-4 focus:ring-[#7CFC00]/20 transition"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Para superadmin, esse campo pode ficar em branco.
+                  </p>
+                </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Usuário ou Email
-              </label>
-              <input
-                type="text"
-                placeholder="usuario ou email"
-                value={usuario}
-                onChange={(e) => setUsuario(e.target.value)}
-                disabled={loading}
-                className="w-full border border-gray-300 focus:border-black focus:ring-2 focus:ring-black/10 outline-none p-3 rounded-xl transition"
-              />
-            </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Usuário ou E-mail
+                  </label>
+                  <div className="relative">
+                    <User
+                      size={18}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+                    <input
+                      type="text"
+                      placeholder="usuario ou email"
+                      value={usuario}
+                      onChange={(e) => setUsuario(e.target.value)}
+                      disabled={loading}
+                      className="w-full h-14 rounded-2xl border border-gray-300 pl-11 pr-4 outline-none focus:border-[#7CFC00] focus:ring-4 focus:ring-[#7CFC00]/20 transition"
+                    />
+                  </div>
+                </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Senha
-              </label>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Senha
+                  </label>
 
-              <div className="relative">
-                <input
-                  type={mostrarSenha ? "text" : "password"}
-                  placeholder="Digite sua senha"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  disabled={loading}
-                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                  className="w-full border border-gray-300 focus:border-black focus:ring-2 focus:ring-black/10 outline-none p-3 pr-20 rounded-xl transition"
-                />
+                  <div className="relative">
+                    <Lock
+                      size={18}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+                    <input
+                      type={mostrarSenha ? "text" : "password"}
+                      placeholder="Digite sua senha"
+                      value={senha}
+                      onChange={(e) => setSenha(e.target.value)}
+                      disabled={loading}
+                      onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                      className="w-full h-14 rounded-2xl border border-gray-300 pl-11 pr-14 outline-none focus:border-[#7CFC00] focus:ring-4 focus:ring-[#7CFC00]/20 transition"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setMostrarSenha(!mostrarSenha)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    >
+                      {mostrarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                {erro ? (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {erro}
+                  </div>
+                ) : null}
 
                 <button
-                  type="button"
-                  onClick={() => setMostrarSenha(!mostrarSenha)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-600 hover:text-black"
+                  onClick={handleLogin}
+                  disabled={loading}
+                  className="w-full h-14 rounded-2xl bg-black text-white font-semibold hover:bg-gray-800 disabled:opacity-60 transition flex items-center justify-center gap-2"
                 >
-                  {mostrarSenha ? "Ocultar" : "Mostrar"}
+                  <LogIn size={18} />
+                  {loading ? "Entrando..." : "Entrar no TreinoPrint"}
                 </button>
               </div>
-            </div>
 
-            {erro && (
-              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
-                <p className="text-red-600 text-sm">{erro}</p>
+              <div className="mt-8 text-center">
+                <p className="text-xs text-gray-400">
+                  TreinoPrint • Gestão de Academias
+                </p>
               </div>
-            )}
-
-            <button
-              onClick={handleLogin}
-              disabled={loading}
-              className="w-full bg-black hover:bg-gray-900 text-white font-semibold p-3 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition"
-            >
-              {loading ? "Entrando..." : "Entrar"}
-            </button>
+            </div>
           </div>
-        </div>
-
-        <div className="mt-6 text-center text-gray-500 text-sm">
-          <p>Versão MVP v1</p>
-          <p>By Lamarck Carregosa - 2026</p>
-        </div>
+        </section>
       </div>
     </main>
   );

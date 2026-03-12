@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Activity } from "lucide-react";
+import SystemLoader from "@/components/SystemLoader";
+import SystemError from "@/components/SystemError";
 
 type Personal = {
   id: number;
@@ -47,7 +50,7 @@ export default function PersonalsPage() {
       const json = await res.json().catch(() => []);
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao carregar personais");
+        setErro((json as any).error || "Erro ao carregar personais");
         return;
       }
 
@@ -109,7 +112,7 @@ export default function PersonalsPage() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao salvar personal");
+        setErro((json as any).error || "Erro ao salvar personal");
         return;
       }
 
@@ -140,7 +143,7 @@ export default function PersonalsPage() {
     const json = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      alert(json.error || "Erro ao excluir personal");
+      alert((json as any).error || "Erro ao excluir personal");
       return;
     }
 
@@ -151,20 +154,62 @@ export default function PersonalsPage() {
     await carregarPersonals();
   };
 
+  if (loading) {
+    return (
+      <SystemLoader
+        titulo="TreinoPrint"
+        subtitulo="Carregando personais..."
+      />
+    );
+  }
+
+  if (erro && personals.length === 0) {
+    return (
+      <SystemError
+        titulo="Erro ao carregar personais"
+        mensagem={erro || "Não foi possível carregar a página."}
+        onTentarNovamente={() => window.location.reload()}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-black text-gray-900">Personais</h1>
-        <p className="text-gray-500 mt-2">
-          Cadastro e gerenciamento de personais
-        </p>
-      </div>
+      <section className="rounded-[32px] bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8 overflow-hidden relative">
+        <div className="absolute -right-10 -top-10 w-72 h-72 bg-[#7CFC00]/10 blur-3xl rounded-full" />
 
-      <section className="bg-white rounded-2xl shadow p-6 space-y-4">
+        <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+          <div>
+            <p className="text-sm text-zinc-300">Painel principal</p>
+            <h1 className="text-3xl md:text-4xl font-black mt-2">
+              Bem-vindo ao Personais
+            </h1>
+            <p className="text-zinc-300 mt-3 max-w-2xl">
+              Cadastre e gerencie os profissionais da academia.
+            </p>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
+            <p className="text-white/60 text-xs">Status do sistema</p>
+            <p className="text-xl font-black mt-1">TreinoPrint Online</p>
+            <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
+              <Activity size={16} />
+              Operação ativa
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-4">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="font-semibold">
-            {editandoId ? "Editar personal" : "Novo personal"}
-          </h2>
+          <div>
+            <h2 className="font-semibold text-xl text-gray-900">
+              {editandoId ? "Editar personal" : "Novo personal"}
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Cadastre ou atualize os dados dos profissionais.
+            </p>
+          </div>
 
           {editandoId ? (
             <button
@@ -229,12 +274,12 @@ export default function PersonalsPage() {
         </button>
       </section>
 
-      <section className="bg-white rounded-2xl shadow p-6">
+      <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
         <h2 className="font-semibold mb-4">Personais cadastrados</h2>
 
-        {loading ? (
-          <p className="text-gray-500">Carregando...</p>
-        ) : personals.length === 0 ? (
+        {erro ? <p className="text-sm text-red-600 mb-4">{erro}</p> : null}
+
+        {personals.length === 0 ? (
           <p className="text-gray-500">Nenhum personal cadastrado.</p>
         ) : (
           <div className="space-y-3">

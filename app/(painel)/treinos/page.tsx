@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Activity } from "lucide-react";
+import SystemLoader from "@/components/SystemLoader";
+import SystemError from "@/components/SystemError";
 
 type Exercicio = {
   nome: string;
@@ -71,7 +74,7 @@ export default function TreinosPage() {
       const json = await res.json().catch(() => []);
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao carregar treinos");
+        setErro((json as any).error || "Erro ao carregar treinos");
         return;
       }
 
@@ -186,7 +189,7 @@ export default function TreinosPage() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao salvar treino");
+        setErro((json as any).error || "Erro ao salvar treino");
         return;
       }
 
@@ -227,18 +230,62 @@ export default function TreinosPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  if (loading) {
+    return (
+      <SystemLoader
+        titulo="TreinoPrint"
+        subtitulo="Carregando treinos..."
+      />
+    );
+  }
+
+  if (erro && treinos.length === 0) {
+    return (
+      <SystemError
+        titulo="Erro ao carregar treinos"
+        mensagem={erro || "Não foi possível carregar a página."}
+        onTentarNovamente={() => window.location.reload()}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-black text-gray-900">Treinos</h1>
-        <p className="text-gray-500 mt-2">Cadastro e gerenciamento de treinos modelo</p>
-      </div>
+      <section className="rounded-[32px] bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8 overflow-hidden relative">
+        <div className="absolute -right-10 -top-10 w-72 h-72 bg-[#7CFC00]/10 blur-3xl rounded-full" />
 
-      <section className="bg-white rounded-2xl shadow p-6 space-y-4">
+        <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+          <div>
+            <p className="text-sm text-zinc-300">Painel principal</p>
+            <h1 className="text-3xl md:text-4xl font-black mt-2">
+              Bem-vindo ao Treinos
+            </h1>
+            <p className="text-zinc-300 mt-3 max-w-2xl">
+              Cadastre e gerencie os treinos modelo da academia.
+            </p>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
+            <p className="text-white/60 text-xs">Status do sistema</p>
+            <p className="text-xl font-black mt-1">TreinoPrint Online</p>
+            <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
+              <Activity size={16} />
+              Operação ativa
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-4">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="font-semibold">
-            {editandoId ? "Editar treino" : "Novo treino"}
-          </h2>
+          <div>
+            <h2 className="font-semibold text-xl text-gray-900">
+              {editandoId ? "Editar treino" : "Novo treino"}
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Monte treinos por semana, dia, nível e tipo.
+            </p>
+          </div>
 
           {editandoId ? (
             <button
@@ -252,7 +299,9 @@ export default function TreinosPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">Semana</label>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">
+              Semana
+            </label>
             <input
               value={semana}
               onChange={(e) => setSemana(e.target.value)}
@@ -262,7 +311,9 @@ export default function TreinosPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">Dia</label>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">
+              Dia
+            </label>
             <select
               value={dia}
               onChange={(e) => setDia(e.target.value)}
@@ -277,7 +328,9 @@ export default function TreinosPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">Nível</label>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">
+              Nível
+            </label>
             <select
               value={nivel}
               onChange={(e) => setNivel(e.target.value)}
@@ -292,7 +345,9 @@ export default function TreinosPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">Tipo</label>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">
+              Tipo
+            </label>
             <select
               value={tipo}
               onChange={(e) => setTipo(e.target.value)}
@@ -327,7 +382,9 @@ export default function TreinosPage() {
               className="border rounded-xl p-3"
               placeholder="Repetições"
               value={novoEx.repeticoes}
-              onChange={(e) => setNovoEx({ ...novoEx, repeticoes: e.target.value })}
+              onChange={(e) =>
+                setNovoEx({ ...novoEx, repeticoes: e.target.value })
+              }
             />
           </div>
 
@@ -433,12 +490,12 @@ export default function TreinosPage() {
         </button>
       </section>
 
-      <section className="bg-white rounded-2xl shadow p-6">
+      <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
         <h2 className="font-semibold mb-4">Treinos cadastrados</h2>
 
-        {loading ? (
-          <p className="text-gray-500">Carregando...</p>
-        ) : treinos.length === 0 ? (
+        {erro ? <p className="text-sm text-red-600 mb-4">{erro}</p> : null}
+
+        {treinos.length === 0 ? (
           <p className="text-gray-500">Nenhum treino cadastrado.</p>
         ) : (
           <div className="space-y-3">
@@ -472,9 +529,12 @@ export default function TreinosPage() {
                   {Array.isArray(treino.exercicios) && treino.exercicios.length > 0 ? (
                     treino.exercicios.map((ex, idx) => (
                       <div key={idx} className="bg-gray-50 rounded-xl px-3 py-2 text-sm">
-                        <p className="font-semibold">{idx + 1}. {ex.nome}</p>
+                        <p className="font-semibold">
+                          {idx + 1}. {ex.nome}
+                        </p>
                         <p className="text-gray-600">
-                          Séries: {ex.series || "-"} | Reps: {ex.repeticoes || "-"} | Carga: {ex.carga || "-"}
+                          Séries: {ex.series || "-"} | Reps: {ex.repeticoes || "-"} | Carga:{" "}
+                          {ex.carga || "-"}
                         </p>
                         {ex.obs ? <p className="text-gray-500">Obs: {ex.obs}</p> : null}
                       </div>

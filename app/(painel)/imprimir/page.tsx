@@ -2,6 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/apiFetch";
+import SystemLoader from "@/components/SystemLoader";
+import SystemError from "@/components/SystemError";
+import {
+  Users,
+  UserCheck,
+  Dumbbell,
+  CalendarDays,
+  AlertTriangle,
+  Wallet,
+  TrendingUp,
+  CreditCard,
+  ArrowRight,
+  Printer,
+  Landmark,
+  Activity,
+} from "lucide-react";
 
 type Aluno = {
   id: number | string;
@@ -209,14 +225,6 @@ export default function ImprimirPage() {
     window.print();
   };
 
-  if (loadingPagina) {
-    return <p className="p-6">Carregando...</p>;
-  }
-
-  if (erroPagina) {
-    return <p className="p-6 text-red-600">{erroPagina}</p>;
-  }
-
   const alunosFiltrados = alunos.filter((a) =>
     a.nome.toLowerCase().includes(buscaAluno.toLowerCase())
   );
@@ -255,12 +263,53 @@ export default function ImprimirPage() {
     }
   };
 
+  if (loadingPagina) {
+    return (
+      <SystemLoader
+        titulo="TreinoPrint"
+        subtitulo="Carregando impressão..."
+      />
+    );
+  }
+
+  if (erroPagina && alunos.length === 0 && personals.length === 0) {
+    return (
+      <SystemError
+        titulo="Erro ao carregar impressão"
+        mensagem={erroPagina || "Não foi possível carregar a página."}
+        onTentarNovamente={() => window.location.reload()}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-black text-gray-900">Imprimir</h1>
-        <p className="text-gray-500 mt-2">Selecione aluno, personal e carregue o treino do banco</p>
-      </div>
+      <section className="rounded-[32px] bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8 overflow-hidden relative">
+        <div className="absolute -right-10 -top-10 w-72 h-72 bg-[#7CFC00]/10 blur-3xl rounded-full" />
+
+        <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+          <div>
+            <p className="text-sm text-zinc-300">Painel principal</p>
+            <h1 className="text-3xl md:text-4xl font-black mt-2">
+              Bem-vindo ao Imprimir
+            </h1>
+            <p className="text-zinc-300 mt-3 max-w-2xl">
+              Selecione aluno, personal e carregue o treino do banco.
+            </p>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
+            <p className="text-white/60 text-xs">Status do sistema</p>
+            <p className="text-xl font-black mt-1">TreinoPrint Online</p>
+             <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
+              <Activity size={16} />
+              Operação ativa
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {erroPagina ? <p className="text-red-600 text-sm">{erroPagina}</p> : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
@@ -467,7 +516,7 @@ export default function ImprimirPage() {
                 />
               ) : (
                 <img
-                  src="/logo-sistema.png"
+                  src="/logo-cupom.png"
                   alt="Logo padrão"
                   style={{ width: "130px", margin: "0 auto" }}
                 />

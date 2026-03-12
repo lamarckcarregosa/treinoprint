@@ -29,9 +29,11 @@ import {
   ArrowRight,
   Printer,
   Landmark,
-  Settings2,
+  Activity,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import SystemLoader from "@/components/SystemLoader";
+import SystemError from "@/components/SystemError";
 
 type TreinoDia = {
   dia: string;
@@ -138,13 +140,14 @@ function PremiumCard({
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="bg-white rounded-3xl shadow-sm border border-black/5 p-5 overflow-hidden relative"
+      className="bg-white rounded-[28px] shadow-sm border border-black/5 p-3 overflow-hidden relative"
     >
       <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-zinc-100 -mr-8 -mt-8" />
+
       <div className="relative flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <p className="text-sm text-zinc-500">{title}</p>
-          <p className={`text-2xl md:text-4xl font-black mt-2 break-words ${valueClassName}`}>
+          <p className={`text-xl md:text-2xl font-black mt-2 break-words ${valueClassName}`}>
             {value}
           </p>
           {subtitle ? <p className="text-sm text-zinc-400 mt-2">{subtitle}</p> : null}
@@ -160,18 +163,23 @@ function PremiumCard({
 
 function SectionCard({
   title,
+  subtitle,
   children,
 }: {
   title: string;
+  subtitle?: string;
   children: React.ReactNode;
 }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-3xl shadow-sm border border-black/5 p-5"
+      className="bg-white rounded-[28px] shadow-sm border border-black/5 p-2"
     >
-      <h2 className="font-bold text-lg mb-4">{title}</h2>
+      <div className="mb-4">
+        <h2 className="font-bold text-lg text-zinc-900">{title}</h2>
+        {subtitle ? <p className="text-sm text-zinc-500 mt-1">{subtitle}</p> : null}
+      </div>
       {children}
     </motion.div>
   );
@@ -191,30 +199,23 @@ function QuickAction({
   return (
     <button
       onClick={onClick}
-      className="group w-full text-left rounded-2xl border border-black/5 bg-white px-4 py-3 shadow-sm hover:shadow-md transition"
+      className="group w-full text-left rounded-2xl border border-black/5 bg-white px-4 py-4 shadow-sm hover:shadow-md transition"
     >
       <div className="flex items-center justify-between gap-3">
-        
-        <div className="flex items-center gap-3">
-          
-          <div className="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center shrink-0">
             {icon}
           </div>
 
-          <div className="leading-tight">
-            <p className="font-semibold text-sm text-zinc-900">
-              {title}
-            </p>
-            <p className="text-xs text-zinc-500">
-              {description}
-            </p>
+          <div className="leading-tight min-w-0">
+            <p className="font-semibold text-sm text-zinc-900">{title}</p>
+            <p className="text-xs text-zinc-500">{description}</p>
           </div>
-
         </div>
 
         <ArrowRight
           size={16}
-          className="text-zinc-400 transition group-hover:translate-x-1"
+          className="text-zinc-400 transition group-hover:translate-x-1 shrink-0"
         />
       </div>
     </button>
@@ -245,11 +246,11 @@ export default function DashboardPage() {
         const json = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          setErro(json.error || "Erro ao carregar dashboard");
+          setErro((json as any).error || "Erro ao carregar dashboard");
           return;
         }
 
-        setDados(json);
+        setDados(json as DashboardData);
       } catch {
         setErro("Erro ao carregar dashboard");
       } finally {
@@ -290,26 +291,64 @@ export default function DashboardPage() {
   }, [dados, lucroMes]);
 
   if (loading) {
-    return <p className="p-6">Carregando dashboard...</p>;
+    return (
+      <SystemLoader
+        titulo="TreinoPrint"
+        subtitulo="Carregando dashboard..."
+      />
+    );
   }
 
   if (erro || !dados) {
-    return <p className="p-6 text-red-600">{erro || "Erro ao carregar dashboard"}</p>;
+    return (
+      <SystemError
+        titulo="Erro ao carregar dashboard"
+        mensagem={erro || "Não foi possível carregar o painel."}
+        onTentarNovamente={() => window.location.reload()}
+      />
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8">
-        <p className="text-sm text-zinc-300">Painel principal</p>
-        <h1 className="text-3xl md:text-4xl font-black mt-2">
-          Bem-vindo ao Dashboard
-        </h1>
-        <p className="text-zinc-300 mt-3">
-          Acompanhe a visão geral de {nomeAcademia} em tempo real.
-        </p>
-      </div>
+      <section className="rounded-[32px] bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8 overflow-hidden relative">
+        <div className="absolute -right-10 -top-10 w-72 h-72 bg-[#7CFC00]/10 blur-3xl rounded-full" />
 
-      <SectionCard title="Filtros e atalhos">
+        <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+          <div>
+            <p className="text-sm text-zinc-300">Painel principal</p>
+            <h1 className="text-3xl md:text-4xl font-black mt-2">
+              Bem-vindo ao Dashboard
+            </h1>
+            <p className="text-zinc-300 mt-3 max-w-2xl">
+              Acompanhe a visão geral de {nomeAcademia} em tempo real.
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <div className="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
+                <p className="text-xs text-zinc-300">Personal mais ativo</p>
+                <p className="font-bold mt-1">{dados.personalMaisAtivo || "-"}</p>
+              </div>
+
+              <div className="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
+                <p className="text-xs text-zinc-300">Dia mais usado</p>
+                <p className="font-bold mt-1">{dados.diaMaisUsado || "-"}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
+            <p className="text-white/60 text-xs">Status do sistema</p>
+            <p className="text-xl font-black mt-1">TreinoPrint Online</p>
+            <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
+              <Activity size={16} />
+              Operação ativa
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <SectionCard title="Filtros e atalhos" subtitle="Escolha o período e acesse rapidamente os módulos principais">
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-zinc-600 mb-2">
@@ -378,12 +417,12 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-0">
         <PremiumCard
           title="Mensalidades em aberto"
           value={dados.mensalidadesEmAberto}
           subtitle="Lançamentos pendentes"
-          icon={<CreditCard size={22} />}
+          icon={<CreditCard size={20} />}
           valueClassName="text-yellow-600"
         />
         <PremiumCard
@@ -396,7 +435,7 @@ export default function DashboardPage() {
         <PremiumCard
           title="Receita do período"
           value={formatBRL(dados.financeiro.receitaMes)}
-          icon={<Wallet size={22} />}
+          icon={<Wallet size={20} />}
           valueClassName="text-green-600"
         />
         <PremiumCard
@@ -409,7 +448,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <SectionCard title="Treinos por dia">
+        <SectionCard title="Treinos por dia" subtitle="Distribuição dos treinos no período selecionado">
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dados.treinosPorDia}>
@@ -423,7 +462,7 @@ export default function DashboardPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Treinos por nível">
+        <SectionCard title="Treinos por nível" subtitle="Participação dos níveis no período">
           <div className="h-72">
             {pieData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-zinc-500">
@@ -445,8 +484,8 @@ export default function DashboardPage() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Financeiro">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+      <SectionCard title="Financeiro" subtitle="Resumo consolidado do período">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-0 mb-2">
           <PremiumCard
             title="Receita"
             value={formatBRL(dados.financeiro.receitaMes)}
@@ -491,7 +530,7 @@ export default function DashboardPage() {
       </SectionCard>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <SectionCard title="Últimos pagamentos">
+        <SectionCard title="Últimos pagamentos" subtitle="Pagamentos confirmados recentemente">
           {dados.ultimosPagamentos.length === 0 ? (
             <p className="text-sm text-zinc-500">Nenhum pagamento recente.</p>
           ) : (
@@ -501,21 +540,21 @@ export default function DashboardPage() {
                   key={item.id}
                   className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3 flex items-center justify-between gap-3"
                 >
-                  <div>
-                    <p className="font-semibold text-zinc-900">{item.aluno}</p>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-zinc-900 truncate">{item.aluno}</p>
                     <p className="text-sm text-zinc-500">
                       {item.forma_pagamento || "-"} • {formatDataHora(item.data_pagamento)}
                     </p>
                   </div>
 
-                  <p className="font-black text-green-600">{formatBRL(item.valor)}</p>
+                  <p className="font-black text-green-600 shrink-0">{formatBRL(item.valor)}</p>
                 </div>
               ))}
             </div>
           )}
         </SectionCard>
 
-        <SectionCard title="Alunos com vencimento em aberto">
+        <SectionCard title="Alunos com vencimento em aberto" subtitle="Mensalidades vencidas ou pendentes">
           {dados.alunosVencidos.length === 0 ? (
             <p className="text-sm text-zinc-500">Nenhum aluno vencido no momento.</p>
           ) : (
@@ -525,14 +564,14 @@ export default function DashboardPage() {
                   key={`${item.aluno}-${index}`}
                   className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3 flex items-center justify-between gap-3"
                 >
-                  <div>
-                    <p className="font-semibold text-zinc-900">{item.aluno}</p>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-zinc-900 truncate">{item.aluno}</p>
                     <p className="text-sm text-zinc-500">
                       Vencimento: {formatData(item.vencimento)}
                     </p>
                   </div>
 
-                  <p className="font-black text-yellow-600">{formatBRL(item.valor)}</p>
+                  <p className="font-black text-yellow-600 shrink-0">{formatBRL(item.valor)}</p>
                 </div>
               ))}
             </div>
@@ -540,7 +579,7 @@ export default function DashboardPage() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Treinos recentes">
+      <SectionCard title="Treinos recentes" subtitle="Últimas movimentações registradas">
         {dados.treinosRecentes.length === 0 ? (
           <p className="text-sm text-zinc-500">Nenhum treino recente.</p>
         ) : (
@@ -548,11 +587,11 @@ export default function DashboardPage() {
             {dados.treinosRecentes.map((item, index) => (
               <div
                 key={index}
-                className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3"
+                className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-4"
               >
-                <p className="font-semibold">{item.aluno}</p>
+                <p className="font-semibold text-zinc-900">{item.aluno}</p>
                 <p className="text-sm text-zinc-500 mt-1">{item.horario}</p>
-                <p className="text-sm text-zinc-600">Treino {item.dia}</p>
+                <p className="text-sm text-zinc-600 mt-1">Treino {item.dia}</p>
               </div>
             ))}
           </div>

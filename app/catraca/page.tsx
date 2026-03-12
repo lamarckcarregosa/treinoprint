@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ProtegePagina from "@/components/ProtegePagina";
 import { apiFetch } from "@/lib/apiFetch";
 
@@ -23,19 +23,6 @@ type AcessoHistorico = {
   created_at: string;
 };
 
-const diasSemana = [
-  "Domingo",
-  "Segunda",
-  "Terça",
-  "Quarta",
-  "Quinta",
-  "Sexta",
-  "Sábado",
-];
-
-const niveis = ["Iniciante", "Intermediário", "Avançado"];
-const tipos = ["Masculino", "Feminino"];
-
 function formatarDataHora(data: string) {
   try {
     return new Date(data).toLocaleString("pt-BR");
@@ -48,10 +35,6 @@ function formatarRelogio() {
   return new Date().toLocaleTimeString("pt-BR");
 }
 
-function getDiaAtual() {
-  return diasSemana[new Date().getDay()];
-}
-
 function CatracaPageContent() {
   const [codigo, setCodigo] = useState("");
   const [resultado, setResultado] = useState<RetornoValidacao | null>(null);
@@ -62,13 +45,6 @@ function CatracaPageContent() {
   const [relogio, setRelogio] = useState(formatarRelogio());
   const [nomeAcademia, setNomeAcademia] = useState("");
   const [segundosReset, setSegundosReset] = useState(0);
-
-  const [mostrarPerguntaImpressao, setMostrarPerguntaImpressao] = useState(false);
-  const [mostrarModalImpressao, setMostrarModalImpressao] = useState(false);
-  const [alunoLiberado, setAlunoLiberado] = useState("");
-  const [diaTreino, setDiaTreino] = useState(getDiaAtual());
-  const [tipoTreino, setTipoTreino] = useState(tipos[0]);
-  const [nivelTreino, setNivelTreino] = useState(niveis[0]);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const timeoutLeituraRef = useRef<NodeJS.Timeout | null>(null);
@@ -94,9 +70,7 @@ function CatracaPageContent() {
     }, 1000);
 
     const manterFoco = () => {
-      if (!mostrarPerguntaImpressao && !mostrarModalImpressao) {
-        inputRef.current?.focus();
-      }
+      inputRef.current?.focus();
     };
 
     window.addEventListener("click", manterFoco);
@@ -109,7 +83,7 @@ function CatracaPageContent() {
       if (resetTelaRef.current) clearTimeout(resetTelaRef.current);
       if (intervalResetRef.current) clearInterval(intervalResetRef.current);
     };
-  }, [mostrarPerguntaImpressao, mostrarModalImpressao]);
+  }, []);
 
   const carregarAcademia = async () => {
     try {
@@ -131,11 +105,7 @@ function CatracaPageContent() {
 
       const json = await res.json().catch(() => []);
 
-      if (!res.ok) {
-        console.error((json as any).error || "Erro ao carregar histórico");
-        return;
-      }
-
+      if (!res.ok) return;
       setHistorico(Array.isArray(json) ? json : []);
     } finally {
       setCarregandoHistorico(false);
@@ -175,9 +145,7 @@ function CatracaPageContent() {
     }, 1000);
 
     resetTelaRef.current = setTimeout(() => {
-      if (!mostrarPerguntaImpressao && !mostrarModalImpressao) {
-        setResultado(null);
-      }
+      setResultado(null);
       setSegundosReset(0);
       inputRef.current?.focus();
     }, 3000);
@@ -223,16 +191,7 @@ function CatracaPageContent() {
       setCodigo("");
 
       await carregarHistorico();
-
-      if (retorno.liberado && retorno.aluno) {
-        setAlunoLiberado(retorno.aluno);
-        setDiaTreino(getDiaAtual());
-        setTipoTreino(tipos[0]);
-        setNivelTreino(niveis[0]);
-        setMostrarPerguntaImpressao(true);
-      } else {
-        limparTelaDepois();
-      }
+      limparTelaDepois();
 
       setTimeout(() => {
         inputRef.current?.focus();
@@ -268,32 +227,6 @@ function CatracaPageContent() {
     } catch {}
   };
 
-  const abrirImpressaoRapida = () => {
-    if (!alunoLiberado) return;
-
-    const params = new URLSearchParams({
-      aluno: alunoLiberado,
-      dia: diaTreino,
-      tipo: tipoTreino,
-      nivel: nivelTreino,
-    });
-
-    window.open(`/imprimir/rapido?${params.toString()}`, "_blank");
-
-    setMostrarModalImpressao(false);
-    setMostrarPerguntaImpressao(false);
-    setResultado(null);
-    setSegundosReset(0);
-    inputRef.current?.focus();
-  };
-
-  const cancelarPergunta = () => {
-    setMostrarPerguntaImpressao(false);
-    setMostrarModalImpressao(false);
-    limparTelaDepois();
-    inputRef.current?.focus();
-  };
-
   const cardResultadoClass = resultado
     ? resultado.liberado
       ? "border-green-300 bg-green-50"
@@ -311,9 +244,9 @@ function CatracaPageContent() {
       <section className="bg-black text-white shadow-md">
         <div className="max-w-6xl mx-auto px-8 py-6 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center p-3 shadow">
+            <div className="w-20 h-20 rounded-2xl flex items-center justify-center p-0 shadow">
               <img
-                src="/logo-sistema.png"
+                src="/logo-sistemas.png"
                 alt="Logo do sistema"
                 className="max-w-full max-h-full object-contain"
               />
@@ -361,9 +294,7 @@ function CatracaPageContent() {
             value={codigo}
             onChange={(e) => handleCodigoChange(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                validar();
-              }
+              if (e.key === "Enter") validar();
             }}
             placeholder="Leia o QR ou digite o código"
             className="w-full border-2 border-black/70 rounded-xl p-4 text-2xl text-center"
@@ -375,7 +306,7 @@ function CatracaPageContent() {
               Com leitura automática ativada, o sistema valida sozinho logo após a leitura.
             </p>
 
-            {resultado && segundosReset > 0 && !mostrarPerguntaImpressao && !mostrarModalImpressao ? (
+            {resultado && segundosReset > 0 ? (
               <p className="text-xs text-gray-500 text-center md:text-right">
                 Limpando tela em {segundosReset}s
               </p>
@@ -481,122 +412,6 @@ function CatracaPageContent() {
           )}
         </section>
       </div>
-
-      {mostrarPerguntaImpressao ? (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
-            <h2 className="text-2xl font-black text-gray-900 text-center">
-              Imprimir treino do dia?
-            </h2>
-
-            <p className="text-center text-gray-600">
-              Aluno: <strong>{alunoLiberado}</strong>
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setMostrarPerguntaImpressao(false);
-                  setMostrarModalImpressao(true);
-                }}
-                className="flex-1 bg-black text-white rounded-xl py-3"
-              >
-                Sim
-              </button>
-
-              <button
-                onClick={cancelarPergunta}
-                className="flex-1 border rounded-xl py-3"
-              >
-                Não
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {mostrarModalImpressao ? (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-5">
-            <h2 className="text-2xl font-black text-gray-900 text-center">
-              Impressão rápida
-            </h2>
-
-            <p className="text-center text-gray-600">
-              Aluno: <strong>{alunoLiberado}</strong>
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1">
-                  Dia
-                </label>
-                <select
-                  value={diaTreino}
-                  onChange={(e) => setDiaTreino(e.target.value)}
-                  className="w-full border rounded-xl p-3"
-                >
-                  {diasSemana.slice(1).map((dia) => (
-                    <option key={dia} value={dia}>
-                      {dia}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1">
-                  Tipo
-                </label>
-                <select
-                  value={tipoTreino}
-                  onChange={(e) => setTipoTreino(e.target.value)}
-                  className="w-full border rounded-xl p-3"
-                >
-                  {tipos.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1">
-                  Nível
-                </label>
-                <select
-                  value={nivelTreino}
-                  onChange={(e) => setNivelTreino(e.target.value)}
-                  className="w-full border rounded-xl p-3"
-                >
-                  {niveis.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={abrirImpressaoRapida}
-                className="flex-1 bg-green-600 text-white rounded-xl py-3"
-              >
-                Imprimir agora
-              </button>
-
-              <button
-                onClick={cancelarPergunta}
-                className="flex-1 border rounded-xl py-3"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </main>
   );
 }
