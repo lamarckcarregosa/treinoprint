@@ -13,6 +13,7 @@ import {
   CreditCard,
   Activity,
   ArrowRight,
+  ActivitySquare,
 } from "lucide-react";
 
 type Permissoes = {

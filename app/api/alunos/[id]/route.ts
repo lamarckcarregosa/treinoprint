@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const { data, error } = await supabaseServer
       .from("alunos")
       .select(
-        "id, nome, telefone, endereco, data_nascimento, cpf, plano, data_matricula, status, foto_url"
+        "id, nome, telefone, endereco, data_nascimento, cpf, plano, data_matricula, status, foto_url, objetivo, peso_meta"
       )
       .eq("id", id)
       .eq("academia_id", academiaId)
@@ -46,6 +46,14 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const plano = String(body.plano || "").trim();
     const status = String(body.status || "ativo").trim();
     const foto_url = String(body.foto_url || "").trim();
+    const objetivo = String(body.objetivo || "").trim();
+
+    const peso_meta =
+      body.peso_meta !== null &&
+      body.peso_meta !== undefined &&
+      String(body.peso_meta).trim() !== ""
+        ? Number(body.peso_meta)
+        : null;
 
     const data_nascimento =
       body.data_nascimento && String(body.data_nascimento).trim() !== ""
@@ -74,6 +82,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
         plano: plano || null,
         status: status || "ativo",
         foto_url: foto_url || null,
+        objetivo: objetivo || null,
+        peso_meta,
         data_nascimento,
         data_matricula,
       })

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "../../../lib/supabase-server";
-import { getAcademiaIdFromRequest } from "../../../lib/getAcademiaIdFromRequest";
+import { supabaseServer } from "@/lib/supabase-server";
+import { getAcademiaIdFromRequest } from "@/lib/getAcademiaIdFromRequest";
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabaseServer
       .from("alunos")
       .select(
-        "id, nome, telefone, endereco, data_nascimento, cpf, plano, data_matricula, status, foto_url, created_at"
+        "id, nome, telefone, endereco, data_nascimento, cpf, plano, data_matricula, status, foto_url, objetivo, peso_meta, created_at"
       )
       .eq("academia_id", academiaId)
       .order("id", { ascending: false });
@@ -39,6 +39,14 @@ export async function POST(req: NextRequest) {
     const plano = String(body.plano || "").trim();
     const status = String(body.status || "ativo").trim();
     const foto_url = String(body.foto_url || "").trim();
+    const objetivo = String(body.objetivo || "").trim();
+
+    const peso_meta =
+      body.peso_meta !== null &&
+      body.peso_meta !== undefined &&
+      String(body.peso_meta).trim() !== ""
+        ? Number(body.peso_meta)
+        : null;
 
     const data_nascimento =
       body.data_nascimento && String(body.data_nascimento).trim() !== ""
@@ -57,7 +65,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1) busca limite da academia
     const { data: academia, error: academiaError } = await supabaseServer
       .from("academias")
       .select("id, nome, plano, limite_alunos, ativa")
@@ -71,7 +78,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2) bloqueia academia inativa
     if (academia.ativa === false) {
       return NextResponse.json(
         { error: "Academia bloqueada. Cadastro de alunos indisponível." },
@@ -79,7 +85,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3) conta quantos alunos já existem
     const { count, error: countError } = await supabaseServer
       .from("alunos")
       .select("*", { count: "exact", head: true })
@@ -92,7 +97,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4) valida limite
     if (
       academia.limite_alunos != null &&
       Number(academia.limite_alunos) > 0 &&
@@ -106,7 +110,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5) cadastra aluno
     const { data, error } = await supabaseServer
       .from("alunos")
       .insert({
@@ -117,6 +120,8 @@ export async function POST(req: NextRequest) {
         plano: plano || null,
         status: status || "ativo",
         foto_url: foto_url || null,
+        objetivo: objetivo || null,
+        peso_meta,
         data_nascimento,
         data_matricula,
         academia_id: academiaId,

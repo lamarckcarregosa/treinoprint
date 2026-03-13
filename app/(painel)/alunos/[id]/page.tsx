@@ -1,8 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+
+import {
+  ChartColumnBig,
+  IdCard,
+  Activity,
+  UserRoundPen,
+  Printer,
+  Undo2,
+  Receipt,
+  Target,
+  ChevronDown,
+  History,
+  PlusCircle,
+} from "lucide-react";
 
 type Aluno = {
   id: number;
@@ -15,6 +29,8 @@ type Aluno = {
   data_matricula?: string;
   status?: string;
   foto_url?: string;
+  objetivo?: string;
+  peso_meta?: number | string;
 };
 
 type Pagamento = {
@@ -61,7 +77,6 @@ function formatData(data?: string | null) {
   if (!data) return "-";
 
   const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(data);
-
   const dt = isDateOnly ? new Date(`${data}T00:00:00`) : new Date(data);
 
   if (Number.isNaN(dt.getTime())) return data;
@@ -80,6 +95,9 @@ export default function AlunoPage() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
 
+  const [menuAval, setMenuAval] = useState(false);
+  const menuAvalRef = useRef<HTMLDivElement | null>(null);
+
   const [editando, setEditando] = useState(false);
   const [salvandoAluno, setSalvandoAluno] = useState(false);
 
@@ -92,6 +110,8 @@ export default function AlunoPage() {
   const [dataMatricula, setDataMatricula] = useState("");
   const [status, setStatus] = useState("ativo");
   const [fotoUrl, setFotoUrl] = useState("");
+  const [objetivo, setObjetivo] = useState("");
+  const [pesoMeta, setPesoMeta] = useState("");
   const [enviandoFoto, setEnviandoFoto] = useState(false);
 
   const carregar = async () => {
@@ -137,6 +157,12 @@ export default function AlunoPage() {
       setDataMatricula(jsonAluno.data_matricula || "");
       setStatus(jsonAluno.status || "ativo");
       setFotoUrl(jsonAluno.foto_url || "");
+      setObjetivo(jsonAluno.objetivo || "");
+      setPesoMeta(
+        jsonAluno.peso_meta !== null && jsonAluno.peso_meta !== undefined
+          ? String(jsonAluno.peso_meta)
+          : ""
+      );
     } catch {
       setErro("Erro ao carregar ficha do aluno");
     } finally {
@@ -147,6 +173,54 @@ export default function AlunoPage() {
   useEffect(() => {
     carregar();
   }, [id]);
+
+  useEffect(() => {
+    const handleClickFora = (event: MouseEvent) => {
+      if (!menuAvalRef.current) return;
+      if (!menuAvalRef.current.contains(event.target as Node)) {
+        setMenuAval(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickFora);
+    return () => {
+      document.removeEventListener("mousedown", handleClickFora);
+    };
+  }, []);
+
+  const abrirUltimaAvaliacao = async () => {
+    try {
+      if (!aluno) return;
+
+      const res = await apiFetch(`/api/avaliacoes?aluno_id=${aluno.id}`, {
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => []);
+
+      if (!res.ok) {
+        alert((json as any).error || "Erro ao buscar avaliações");
+        return;
+      }
+
+      const lista = Array.isArray(json) ? json : [];
+
+      if (lista.length === 0) {
+        alert("Este aluno ainda não possui avaliação cadastrada.");
+        return;
+      }
+
+      const ultima = [...lista].sort((a: any, b: any) =>
+        String(b.data_avaliacao || "").localeCompare(
+          String(a.data_avaliacao || "")
+        )
+      )[0];
+
+      setMenuAval(false);
+      router.push(`/avaliacoes/${ultima.id}`);
+    } catch {
+      alert("Erro ao buscar avaliação");
+    }
+  };
 
   const uploadFoto = async (file: File) => {
     try {
@@ -187,6 +261,8 @@ export default function AlunoPage() {
           data_matricula: dataMatricula || null,
           status,
           foto_url: urlFoto,
+          objetivo,
+          peso_meta: pesoMeta ? Number(pesoMeta) : null,
         }),
       });
 
@@ -229,6 +305,8 @@ export default function AlunoPage() {
           data_matricula: dataMatricula || null,
           status: status.trim(),
           foto_url: fotoUrl.trim(),
+          objetivo: objetivo.trim(),
+          peso_meta: pesoMeta ? Number(pesoMeta) : null,
         }),
       });
 
@@ -311,31 +389,100 @@ export default function AlunoPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
+          <div className="relative" ref={menuAvalRef}>
+            <button
+              type="button"
+              onClick={() => setMenuAval((v) => !v)}
+              className="flex items-center gap-2 bg-black text-white rounded-xl px-4 py-3"
+            >
+              <Activity size={16} />
+              Avaliação física
+              <ChevronDown size={15} />
+            </button>
+
+            {menuAval && (
+              <div className="absolute left-0 top-full mt-2 w-64 bg-white border border-black/10 rounded-2xl shadow-xl overflow-hidden z-50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuAval(false);
+                    router.push(`/avaliacoes/nova?aluno_id=${aluno.id}`);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-800 hover:bg-gray-50 transition"
+                >
+                  <PlusCircle size={16} />
+                  Nova avaliação
+                </button>
+
+                <button
+                  type="button"
+                  onClick={abrirUltimaAvaliacao}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-800 hover:bg-gray-50 transition"
+                >
+                  <Activity size={16} />
+                  Última avaliação
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuAval(false);
+                    router.push(`/avaliacoes/historico?aluno_id=${aluno.id}`);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-800 hover:bg-gray-50 transition"
+                >
+                  <History size={16} />
+                  Histórico de avaliações
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuAval(false);
+                    router.push(
+                      `/alunos/${aluno.id}/evolucao?meta=${encodeURIComponent(
+                        objetivo || "geral"
+                      )}`
+                    );
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-800 hover:bg-gray-50 transition"
+                >
+                  <ChartColumnBig size={16} />
+                  Dashboard corporal
+                </button>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => router.push(`/alunos/${id}/carteirinha`)}
-            className="bg-emerald-600 text-white px-5 py-3 rounded-xl"
+            className="flex items-center gap-2 bg-emerald-600 text-white rounded-xl px-4 py-3"
           >
+            <IdCard size={16} />
             Carteirinha
           </button>
 
           <button
             onClick={() => setEditando((v) => !v)}
-            className="bg-blue-600 text-white px-5 py-3 rounded-xl"
+            className="flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-3"
           >
+            <UserRoundPen size={16} />
             {editando ? "Cancelar edição" : "Editar aluno"}
           </button>
 
           <button
             onClick={imprimirFicha}
-            className="bg-zinc-800 text-white px-5 py-3 rounded-xl"
+            className="flex items-center gap-2 bg-zinc-800 text-white rounded-xl px-4 py-3"
           >
+            <Printer size={16} />
             Imprimir ficha
           </button>
 
           <button
             onClick={() => router.push("/alunos")}
-            className="bg-black text-white px-5 py-3 rounded-xl"
+            className="flex items-center gap-2 bg-black text-white rounded-xl px-2 py-3"
           >
+            <Undo2 size={16} />
             Voltar
           </button>
         </div>
@@ -382,6 +529,13 @@ export default function AlunoPage() {
               </p>
               <p>
                 <strong>Endereço:</strong> {aluno.endereco || "-"}
+              </p>
+              <p>
+                <strong>Objetivo:</strong> {aluno.objetivo || "-"}
+              </p>
+              <p>
+                <strong>Peso meta:</strong>{" "}
+                {aluno.peso_meta ? `${aluno.peso_meta} kg` : "-"}
               </p>
             </div>
           </div>
@@ -477,6 +631,26 @@ export default function AlunoPage() {
                 placeholder="URL da foto"
                 className="border rounded-xl p-3"
               />
+
+              <input
+                value={objetivo}
+                onChange={(e) => setObjetivo(e.target.value)}
+                placeholder="Objetivo do aluno"
+                className="border rounded-xl p-3"
+              />
+
+              <div className="relative">
+                <Target
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+                <input
+                  value={pesoMeta}
+                  onChange={(e) => setPesoMeta(e.target.value)}
+                  placeholder="Peso meta (kg)"
+                  className="border rounded-xl p-3 pl-10 w-full"
+                />
+              </div>
             </div>
 
             <button
@@ -532,9 +706,7 @@ export default function AlunoPage() {
                   <p className="text-sm text-gray-600">
                     Vencimento: {formatData(item.vencimento)}
                   </p>
-                  <p className="text-sm text-gray-600">
-                    Status: {item.status}
-                  </p>
+                  <p className="text-sm text-gray-600">Status: {item.status}</p>
 
                   {item.forma_pagamento ? (
                     <p className="text-sm text-blue-600">
@@ -565,8 +737,9 @@ export default function AlunoPage() {
                   {item.status === "pago" ? (
                     <button
                       onClick={() => abrirComprovante(item.id)}
-                      className="bg-emerald-600 text-white px-4 py-2 rounded-xl"
+                      className="flex items-center gap-2 bg-emerald-600 text-white rounded-xl px-2 py-3"
                     >
+                      <Receipt size={16} />
                       Comprovante
                     </button>
                   ) : null}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProtegePagina from "@/components/ProtegePagina";
+import { apiFetch } from "@/lib/apiFetch";
 
 type Permissoes = {
   dashboard: boolean;
@@ -15,6 +16,7 @@ type Permissoes = {
   sistema: boolean;
   superadmin: boolean;
   alterar_senha: boolean;
+  avaliacoes: boolean;
 };
 
 type UsuarioPermissao = {
@@ -26,8 +28,6 @@ type UsuarioPermissao = {
   permissoes: Permissoes;
 };
 
-import { apiFetch } from "@/lib/apiFetch";
-
 const colunas: { chave: keyof Permissoes; label: string }[] = [
   { chave: "dashboard", label: "Dashboard" },
   { chave: "alunos", label: "Alunos" },
@@ -37,7 +37,8 @@ const colunas: { chave: keyof Permissoes; label: string }[] = [
   { chave: "pagamentos", label: "Pagamentos" },
   { chave: "financeiro", label: "Financeiro" },
   { chave: "sistema", label: "Sistema" },
-   { chave: "alterar_senha", label: "Senha" },
+  { chave: "alterar_senha", label: "Senha" },
+  { chave: "avaliacoes", label: "Avaliações" },
 ];
 
 function PermissoesPageContent() {
@@ -54,7 +55,7 @@ function PermissoesPageContent() {
       const json = await res.json().catch(() => []);
 
       if (!res.ok) {
-        setErro(json.error || "Erro ao carregar permissões");
+        setErro((json as any).error || "Erro ao carregar permissões");
         return;
       }
 
@@ -115,7 +116,7 @@ function PermissoesPageContent() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        alert(json.error || "Erro ao salvar permissões");
+        alert((json as any).error || "Erro ao salvar permissões");
         return;
       }
 
@@ -182,7 +183,7 @@ function PermissoesPageContent() {
                     >
                       <input
                         type="checkbox"
-                        checked={item.permissoes[coluna.chave]}
+                        checked={!!item.permissoes[coluna.chave]}
                         onChange={(e) =>
                           atualizarPermissao(item.id, coluna.chave, e.target.checked)
                         }

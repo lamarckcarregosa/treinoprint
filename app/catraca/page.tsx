@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ProtegePagina from "@/components/ProtegePagina";
 import { apiFetch } from "@/lib/apiFetch";
 
 type RetornoValidacao = {
   liberado?: boolean;
+  aluno_id?: number | null;
   aluno?: string | null;
   foto?: string | null;
   motivo?: string;
@@ -21,6 +22,14 @@ type AcessoHistorico = {
   motivo?: string | null;
   origem?: string | null;
   created_at: string;
+};
+
+type TreinoOpcao = {
+  id: number;
+  semana?: string;
+  dia?: string;
+  nivel?: string;
+  tipo?: string;
 };
 
 function formatarDataHora(data: string) {
@@ -45,6 +54,15 @@ function CatracaPageContent() {
   const [relogio, setRelogio] = useState(formatarRelogio());
   const [nomeAcademia, setNomeAcademia] = useState("");
   const [segundosReset, setSegundosReset] = useState(0);
+
+  const [mostrarPerguntaImpressao, setMostrarPerguntaImpressao] = useState(false);
+  const [mostrarEscolhaTreino, setMostrarEscolhaTreino] = useState(false);
+  const [carregandoTreinos, setCarregandoTreinos] = useState(false);
+  const [treinos, setTreinos] = useState<TreinoOpcao[]>([]);
+
+  const [diaSelecionado, setDiaSelecionado] = useState("");
+  const [nivelSelecionado, setNivelSelecionado] = useState("");
+  const [tipoSelecionado, setTipoSelecionado] = useState("");
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const timeoutLeituraRef = useRef<NodeJS.Timeout | null>(null);
@@ -112,6 +130,40 @@ function CatracaPageContent() {
     }
   };
 
+  const cancelarAutoReset = () => {
+    if (resetTelaRef.current) clearTimeout(resetTelaRef.current);
+    if (intervalResetRef.current) clearInterval(intervalResetRef.current);
+    setSegundosReset(0);
+  };
+
+  const limparTelaDepois = () => {
+    cancelarAutoReset();
+
+    setSegundosReset(12);
+
+    intervalResetRef.current = setInterval(() => {
+      setSegundosReset((prev) => {
+        if (prev <= 1) {
+          if (intervalResetRef.current) clearInterval(intervalResetRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    resetTelaRef.current = setTimeout(() => {
+      setResultado(null);
+      setMostrarPerguntaImpressao(false);
+      setMostrarEscolhaTreino(false);
+      setTreinos([]);
+      setDiaSelecionado("");
+      setNivelSelecionado("");
+      setTipoSelecionado("");
+      setSegundosReset(0);
+      inputRef.current?.focus();
+    }, 12000);
+  };
+
   const tocarSom = (liberado?: boolean) => {
     try {
       if (liberado) {
@@ -128,27 +180,30 @@ function CatracaPageContent() {
     } catch {}
   };
 
-  const limparTelaDepois = () => {
-    if (resetTelaRef.current) clearTimeout(resetTelaRef.current);
-    if (intervalResetRef.current) clearInterval(intervalResetRef.current);
+  const carregarTreinos = async () => {
+    try {
+      setCarregandoTreinos(true);
 
-    setSegundosReset(3);
-
-    intervalResetRef.current = setInterval(() => {
-      setSegundosReset((prev) => {
-        if (prev <= 1) {
-          if (intervalResetRef.current) clearInterval(intervalResetRef.current);
-          return 0;
-        }
-        return prev - 1;
+      const res = await apiFetch("/api/treinos", {
+        cache: "no-store",
       });
-    }, 1000);
 
-    resetTelaRef.current = setTimeout(() => {
-      setResultado(null);
-      setSegundosReset(0);
-      inputRef.current?.focus();
-    }, 3000);
+      const json = await res.json().catch(() => []);
+
+      if (!res.ok) {
+        alert((json as any).error || "Erro ao carregar treinos");
+        return;
+      }
+
+      const lista = Array.isArray(json) ? json : [];
+      setTreinos(lista);
+      setDiaSelecionado("");
+      setNivelSelecionado("");
+      setTipoSelecionado("");
+      setMostrarEscolhaTreino(true);
+    } finally {
+      setCarregandoTreinos(false);
+    }
   };
 
   const validar = async (codigoParaValidar?: string) => {
@@ -173,12 +228,15 @@ function CatracaPageContent() {
       if (!res.ok) {
         const retornoErro = {
           liberado: false,
+          aluno_id: null,
           aluno: null,
           foto: null,
           motivo: (json as any).error || "Erro ao validar acesso",
         };
 
         setResultado(retornoErro);
+        setMostrarPerguntaImpressao(false);
+        setMostrarEscolhaTreino(false);
         tocarSom(false);
         setCodigo("");
         limparTelaDepois();
@@ -191,7 +249,16 @@ function CatracaPageContent() {
       setCodigo("");
 
       await carregarHistorico();
-      limparTelaDepois();
+
+      if (retorno.liberado && retorno.aluno_id) {
+        cancelarAutoReset();
+        setMostrarPerguntaImpressao(true);
+        setMostrarEscolhaTreino(false);
+      } else {
+        setMostrarPerguntaImpressao(false);
+        setMostrarEscolhaTreino(false);
+        limparTelaDepois();
+      }
 
       setTimeout(() => {
         inputRef.current?.focus();
@@ -238,6 +305,90 @@ function CatracaPageContent() {
       ? "text-green-700"
       : "text-red-700"
     : "text-gray-900";
+
+  const diasDisponiveis = useMemo(() => {
+    return Array.from(
+      new Set(
+        treinos
+          .map((item) => String(item.dia || "").trim())
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [treinos]);
+
+  const niveisDisponiveis = useMemo(() => {
+    if (!diaSelecionado) return [];
+
+    return Array.from(
+      new Set(
+        treinos
+          .filter((item) => String(item.dia || "").trim() === diaSelecionado)
+          .map((item) => String(item.nivel || "").trim())
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [treinos, diaSelecionado]);
+
+  const tiposDisponiveis = useMemo(() => {
+    if (!diaSelecionado || !nivelSelecionado) return [];
+
+    return Array.from(
+      new Set(
+        treinos
+          .filter(
+            (item) =>
+              String(item.dia || "").trim() === diaSelecionado &&
+              String(item.nivel || "").trim() === nivelSelecionado
+          )
+          .map((item) => String(item.tipo || "").trim())
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [treinos, diaSelecionado, nivelSelecionado]);
+
+  useEffect(() => {
+    if (mostrarEscolhaTreino && diasDisponiveis.length === 1 && !diaSelecionado) {
+      setDiaSelecionado(diasDisponiveis[0]);
+    }
+  }, [mostrarEscolhaTreino, diasDisponiveis, diaSelecionado]);
+
+  useEffect(() => {
+    if (niveisDisponiveis.length === 1 && diaSelecionado && !nivelSelecionado) {
+      setNivelSelecionado(niveisDisponiveis[0]);
+    }
+  }, [niveisDisponiveis, diaSelecionado, nivelSelecionado]);
+
+  useEffect(() => {
+    if (tiposDisponiveis.length === 1 && diaSelecionado && nivelSelecionado && !tipoSelecionado) {
+      setTipoSelecionado(tiposDisponiveis[0]);
+    }
+  }, [tiposDisponiveis, diaSelecionado, nivelSelecionado, tipoSelecionado]);
+
+  const treinoSelecionado = useMemo(() => {
+    if (!diaSelecionado || !nivelSelecionado || !tipoSelecionado) return null;
+
+    return (
+      treinos.find(
+        (item) =>
+          String(item.dia || "").trim() === diaSelecionado &&
+          String(item.nivel || "").trim() === nivelSelecionado &&
+          String(item.tipo || "").trim() === tipoSelecionado
+      ) || null
+    );
+  }, [treinos, diaSelecionado, nivelSelecionado, tipoSelecionado]);
+
+  const abrirImpressaoCupom = () => {
+    if (!resultado?.aluno_id || !treinoSelecionado?.id) return;
+
+    window.open(
+      `/imprimir/rapido?aluno_id=${resultado.aluno_id}&treino_id=${treinoSelecionado.id}`,
+      "_blank"
+    );
+
+    setMostrarPerguntaImpressao(false);
+    setMostrarEscolhaTreino(false);
+    limparTelaDepois();
+  };
 
   return (
     <main className="min-h-screen bg-gray-100">
@@ -412,6 +563,164 @@ function CatracaPageContent() {
           )}
         </section>
       </div>
+
+      {mostrarPerguntaImpressao && resultado?.liberado && resultado?.aluno_id ? (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-black text-gray-900">
+              Deseja imprimir treino atual?
+            </h2>
+
+            <p className="text-gray-500">
+              {resultado.aluno ? `Aluno: ${resultado.aluno}` : ""}
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={async () => {
+                  setMostrarPerguntaImpressao(false);
+                  await carregarTreinos();
+                }}
+                className="bg-black text-white rounded-xl py-3 font-semibold"
+              >
+                Sim
+              </button>
+
+              <button
+                onClick={() => {
+                  setMostrarPerguntaImpressao(false);
+                  limparTelaDepois();
+                }}
+                className="border rounded-xl py-3 font-semibold"
+              >
+                Não
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {mostrarEscolhaTreino ? (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-2xl font-black text-gray-900">
+                Escolher treino para imprimir
+              </h2>
+
+              <button
+                onClick={() => {
+                  setMostrarEscolhaTreino(false);
+                  limparTelaDepois();
+                }}
+                className="border rounded-xl px-4 py-2"
+              >
+                Fechar
+              </button>
+            </div>
+
+            {carregandoTreinos ? (
+              <p className="text-gray-500">Carregando treinos...</p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Dia</label>
+                    <select
+                      value={diaSelecionado}
+                      onChange={(e) => {
+                        setDiaSelecionado(e.target.value);
+                        setNivelSelecionado("");
+                        setTipoSelecionado("");
+                      }}
+                      className="w-full border rounded-xl p-3"
+                    >
+                      <option value="">Selecione</option>
+                      {diasDisponiveis.map((dia) => (
+                        <option key={dia} value={dia}>
+                          {dia}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Nível</label>
+                    <select
+                      value={nivelSelecionado}
+                      onChange={(e) => {
+                        setNivelSelecionado(e.target.value);
+                        setTipoSelecionado("");
+                      }}
+                      className="w-full border rounded-xl p-3"
+                      disabled={!diaSelecionado}
+                    >
+                      <option value="">Selecione</option>
+                      {niveisDisponiveis.map((nivel) => (
+                        <option key={nivel} value={nivel}>
+                          {nivel}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Tipo</label>
+                    <select
+                      value={tipoSelecionado}
+                      onChange={(e) => setTipoSelecionado(e.target.value)}
+                      className="w-full border rounded-xl p-3"
+                      disabled={!diaSelecionado || !nivelSelecionado}
+                    >
+                      <option value="">Selecione</option>
+                      {tiposDisponiveis.map((tipo) => (
+                        <option key={tipo} value={tipo}>
+                          {tipo}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {treinoSelecionado ? (
+                  <div className="rounded-2xl border p-4 bg-gray-50">
+                    <p className="font-semibold text-gray-900">
+                      Treino: {treinoSelecionado.dia || "-"}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Nível: {treinoSelecionado.nivel || "-"}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Tipo: {treinoSelecionado.tipo || "-"}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Semana: {treinoSelecionado.semana || "-"}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    Selecione dia, nível e tipo para localizar o treino.
+                  </p>
+                )}
+
+                <button
+                  onClick={abrirImpressaoCupom}
+                  disabled={!treinoSelecionado}
+                  className="bg-black text-white rounded-xl px-5 py-3 font-semibold disabled:opacity-50"
+                >
+                  Imprimir cupom
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

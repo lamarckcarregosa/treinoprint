@@ -14,47 +14,34 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // superadmin não precisa de permissões customizadas
-    const { data: profile } = await supabaseServer
-      .from("profiles")
-      .select("tipo")
-      .eq("id", profileId)
-      .single();
-
-    if (profile?.tipo === "superadmin") {
-      return NextResponse.json(null);
-    }
-
-    if (!academiaId) {
-      return NextResponse.json(null);
-    }
-
     const { data, error } = await supabaseServer
       .from("permissoes_usuarios")
-      .select(`
-        dashboard,
-        alunos,
-        personais,
-        treinos,
-        imprimir,
-        pagamentos,
-        financeiro,
-        sistema,
-        alterar_senha,
-        superadmin
-      `)
+      .select(
+        "dashboard, alunos, personais, treinos, imprimir, pagamentos, financeiro, sistema, superadmin, alterar_senha, avaliacoes"
+      )
       .eq("profile_id", profileId)
       .eq("academia_id", academiaId)
       .maybeSingle();
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data || null);
+    return NextResponse.json(
+      data || {
+        dashboard: false,
+        alunos: false,
+        personais: false,
+        treinos: false,
+        imprimir: false,
+        pagamentos: false,
+        financeiro: false,
+        sistema: false,
+        superadmin: false,
+        alterar_senha: false,
+        avaliacoes: false,
+      }
+    );
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Erro ao carregar permissões" },

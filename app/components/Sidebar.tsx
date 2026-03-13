@@ -20,6 +20,7 @@ import {
   ChevronRight,
   KeyRound,
   ArrowLeftRight,
+  ActivitySquare,
 } from "lucide-react";
 import { Permissao, PermissoesObjeto, temPermissao } from "@/lib/permissoes";
 
@@ -100,7 +101,7 @@ export default function Sidebar() {
     { href: "/treinos", label: "Treinos", icon: Dumbbell, permissao: "treinos" },
     { href: "/financeiro", label: "Financeiro", icon: Landmark, permissao: "financeiro" },
     { href: "/sistema", label: "Sistema", icon: Settings2, permissao: "sistema" },
-    { href: "/catraca", label: "Catraca", icon: ShieldCheck, permissao: "imprimir" }
+    { href: "/avaliacoes", label: "Avaliações", icon: ActivitySquare, permissao: "imprimir" }
   ];
 
   const menuComSuperadmin: MenuItem[] = [

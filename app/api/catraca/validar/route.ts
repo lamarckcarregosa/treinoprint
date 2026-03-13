@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         liberado: false,
+        aluno_id: null,
         aluno: null,
         foto: null,
         motivo: "Aluno não encontrado",
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         liberado: false,
+        aluno_id: aluno.id,
         aluno: aluno.nome,
         foto: fotoUrl,
         motivo: "Aluno inativo",
@@ -121,6 +123,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
           liberado: false,
+          aluno_id: aluno.id,
           aluno: aluno.nome,
           foto: fotoUrl,
           motivo,
@@ -156,6 +159,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         liberado: false,
+        aluno_id: aluno.id,
         aluno: aluno.nome,
         foto: fotoUrl,
         motivo,
@@ -174,6 +178,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       liberado: true,
+      aluno_id: aluno.id,
       aluno: aluno.nome,
       foto: fotoUrl,
       motivo: "Acesso liberado",
