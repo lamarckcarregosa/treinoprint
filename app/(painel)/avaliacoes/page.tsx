@@ -202,7 +202,7 @@ function AvaliacoesHomePageContent() {
 
 export default function AvaliacoesHomePage() {
   return (
-    <ProtegePagina permissao="avaliacoes">
+    <ProtegePagina permissao="imprimir">
       <AvaliacoesHomePageContent />
     </ProtegePagina>
   );

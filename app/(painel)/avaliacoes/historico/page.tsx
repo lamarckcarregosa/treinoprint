@@ -192,7 +192,7 @@ function HistoricoAvaliacoesPageContent() {
 
 export default function HistoricoAvaliacoesPage() {
   return (
-    <ProtegePagina permissao="avaliacoes">
+    <ProtegePagina permissao="imprimir">
       <HistoricoAvaliacoesPageContent />
     </ProtegePagina>
   );
