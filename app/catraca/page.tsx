@@ -64,6 +64,9 @@ function CatracaPageContent() {
   const [nivelSelecionado, setNivelSelecionado] = useState("");
   const [tipoSelecionado, setTipoSelecionado] = useState("");
 
+  const [personais, setPersonais] = useState<string[]>([]);
+  const [personalSelecionado, setPersonalSelecionado] = useState("");
+
   const inputRef = useRef<HTMLInputElement | null>(null);
   const timeoutLeituraRef = useRef<NodeJS.Timeout | null>(null);
   const resetTelaRef = useRef<NodeJS.Timeout | null>(null);
@@ -82,6 +85,16 @@ function CatracaPageContent() {
 
     carregarHistorico();
     carregarAcademia();
+    carregarPersonais();
+
+    const personalSalvo =
+      typeof window !== "undefined"
+        ? localStorage.getItem("treinoprint_catraca_personal") || ""
+        : "";
+
+    if (personalSalvo) {
+      setPersonalSelecionado(personalSalvo);
+    }
 
     const timerRelogio = setInterval(() => {
       setRelogio(formatarRelogio());
@@ -102,6 +115,28 @@ function CatracaPageContent() {
       if (intervalResetRef.current) clearInterval(intervalResetRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (personalSelecionado && typeof window !== "undefined") {
+      localStorage.setItem("treinoprint_catraca_personal", personalSelecionado);
+    }
+  }, [personalSelecionado]);
+
+  useEffect(() => {
+    if (!personalSelecionado && personais.length > 0) {
+      const salvo =
+        typeof window !== "undefined"
+          ? localStorage.getItem("treinoprint_catraca_personal") || ""
+          : "";
+
+      if (salvo && personais.includes(salvo)) {
+        setPersonalSelecionado(salvo);
+        return;
+      }
+
+      setPersonalSelecionado(personais[0]);
+    }
+  }, [personais, personalSelecionado]);
 
   const carregarAcademia = async () => {
     try {
@@ -128,6 +163,26 @@ function CatracaPageContent() {
     } finally {
       setCarregandoHistorico(false);
     }
+  };
+
+  const carregarPersonais = async () => {
+    try {
+      const res = await apiFetch("/api/personals", {
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => []);
+
+      if (!res.ok) return;
+
+      const nomes = Array.isArray(json)
+        ? json
+            .map((item: any) => String(item.nome || "").trim())
+            .filter(Boolean)
+        : [];
+
+      setPersonais(nomes);
+    } catch {}
   };
 
   const cancelarAutoReset = () => {
@@ -359,7 +414,12 @@ function CatracaPageContent() {
   }, [niveisDisponiveis, diaSelecionado, nivelSelecionado]);
 
   useEffect(() => {
-    if (tiposDisponiveis.length === 1 && diaSelecionado && nivelSelecionado && !tipoSelecionado) {
+    if (
+      tiposDisponiveis.length === 1 &&
+      diaSelecionado &&
+      nivelSelecionado &&
+      !tipoSelecionado
+    ) {
       setTipoSelecionado(tiposDisponiveis[0]);
     }
   }, [tiposDisponiveis, diaSelecionado, nivelSelecionado, tipoSelecionado]);
@@ -380,13 +440,23 @@ function CatracaPageContent() {
   const abrirImpressaoCupom = () => {
     if (!resultado?.aluno_id || !treinoSelecionado?.id) return;
 
+    if (!personalSelecionado) {
+      alert("Selecione o personal antes de imprimir.");
+      return;
+    }
+
     window.open(
-      `/imprimir/rapido?aluno_id=${resultado.aluno_id}&treino_id=${treinoSelecionado.id}`,
+      `/imprimir/rapido?aluno_id=${resultado.aluno_id}&treino_id=${treinoSelecionado.id}&origem=catraca&auto_print=1&personal_nome=${encodeURIComponent(
+        personalSelecionado
+      )}`,
       "_blank"
     );
 
     setMostrarPerguntaImpressao(false);
     setMostrarEscolhaTreino(false);
+    setDiaSelecionado("");
+    setNivelSelecionado("");
+    setTipoSelecionado("");
     limparTelaDepois();
   };
 
@@ -629,7 +699,23 @@ function CatracaPageContent() {
               <p className="text-gray-500">Carregando treinos...</p>
             ) : (
               <div className="space-y-4">
-                <div className="grid md:grid-cols-3 gap-3">
+                <div className="grid md:grid-cols-2 gap-3">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold mb-1">Personal</label>
+                    <select
+                      value={personalSelecionado}
+                      onChange={(e) => setPersonalSelecionado(e.target.value)}
+                      className="w-full border rounded-xl p-3"
+                    >
+                      <option value="">Selecione o personal</option>
+                      {personais.map((nome) => (
+                        <option key={nome} value={nome}>
+                          {nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-semibold mb-1">Dia</label>
                     <select
@@ -670,7 +756,7 @@ function CatracaPageContent() {
                     </select>
                   </div>
 
-                  <div>
+                  <div className="md:col-span-2">
                     <label className="block text-sm font-semibold mb-1">Tipo</label>
                     <select
                       value={tipoSelecionado}
@@ -702,16 +788,19 @@ function CatracaPageContent() {
                     <p className="text-sm text-gray-600">
                       Semana: {treinoSelecionado.semana || "-"}
                     </p>
+                    <p className="text-sm text-gray-600">
+                      Personal: {personalSelecionado || "-"}
+                    </p>
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500">
-                    Selecione dia, nível e tipo para localizar o treino.
+                    Selecione personal, dia, nível e tipo para localizar o treino.
                   </p>
                 )}
 
                 <button
                   onClick={abrirImpressaoCupom}
-                  disabled={!treinoSelecionado}
+                  disabled={!treinoSelecionado || !personalSelecionado}
                   className="bg-black text-white rounded-xl px-5 py-3 font-semibold disabled:opacity-50"
                 >
                   Imprimir cupom

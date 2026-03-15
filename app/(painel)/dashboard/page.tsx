@@ -30,6 +30,11 @@ import {
   Printer,
   Landmark,
   Activity,
+  Target,
+  ShieldAlert,
+  BarChart3,
+  Clock3,
+  Trophy,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import SystemLoader from "@/components/SystemLoader";
@@ -49,6 +54,21 @@ type TreinoRecente = {
   horario: string;
   aluno: string;
   dia: string;
+};
+
+type TreinoHorario = {
+  hora: string;
+  total: number;
+};
+
+type RankingItem = {
+  nome: string;
+  total: number;
+};
+
+type DiaMovimento = {
+  dia: string;
+  total: number;
 };
 
 type UltimoPagamento = {
@@ -76,6 +96,10 @@ type DashboardData = {
   treinosPorDia: TreinoDia[];
   treinosPorNivel: TreinoNivel[];
   treinosRecentes: TreinoRecente[];
+  treinosPorHorario: TreinoHorario[];
+  rankingPersonal: RankingItem[];
+  alunosMaisTreinam: RankingItem[];
+  diasMaisMovimentados: DiaMovimento[];
   ultimosPagamentos: UltimoPagamento[];
   alunosVencidos: AlunoVencido[];
   financeiro: {
@@ -140,7 +164,7 @@ function PremiumCard({
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="bg-white rounded-[28px] shadow-sm border border-black/5 p-3 overflow-hidden relative"
+      className="bg-white rounded-[28px] shadow-sm border border-black/5 p-4 overflow-hidden relative"
     >
       <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-zinc-100 -mr-8 -mt-8" />
 
@@ -174,7 +198,7 @@ function SectionCard({
     <motion.div
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-[28px] shadow-sm border border-black/5 p-2"
+      className="bg-white rounded-[28px] shadow-sm border border-black/5 p-4"
     >
       <div className="mb-4">
         <h2 className="font-bold text-lg text-zinc-900">{title}</h2>
@@ -270,7 +294,7 @@ export default function DashboardPage() {
     [dados]
   );
 
-  const pieColors = ["#111827", "#374151", "#6B7280", "#9CA3AF"];
+  const pieColors = ["#111827", "#374151", "#6B7280", "#9CA3AF", "#D1D5DB"];
 
   const lucroMes = useMemo(() => {
     if (!dados) return 0;
@@ -289,6 +313,29 @@ export default function DashboardPage() {
       },
     ];
   }, [dados, lucroMes]);
+
+  const taxaAtividade = useMemo(() => {
+    if (!dados?.alunosCadastrados) return 0;
+    return Math.round(
+      (Number(dados.alunosAtivos || 0) / Number(dados.alunosCadastrados || 0)) * 100
+    );
+  }, [dados]);
+
+  const taxaInadimplencia = useMemo(() => {
+    if (!dados?.alunosAtivos) return 0;
+    return Math.round(
+      (Number(dados.inadimplentes || 0) / Number(dados.alunosAtivos || 0)) * 100
+    );
+  }, [dados]);
+
+  const nivelMaisUsado = useMemo(() => {
+    if (!dados?.treinosPorNivel?.length) return "-";
+    return [...dados.treinosPorNivel].sort((a, b) => b.total - a.total)[0]?.nivel || "-";
+  }, [dados]);
+
+  const totalTreinosPeriodo = useMemo(() => {
+    return (dados?.treinosPorDia || []).reduce((acc, item) => acc + Number(item.total || 0), 0);
+  }, [dados]);
 
   if (loading) {
     return (
@@ -334,6 +381,11 @@ export default function DashboardPage() {
                 <p className="text-xs text-zinc-300">Dia mais usado</p>
                 <p className="font-bold mt-1">{dados.diaMaisUsado || "-"}</p>
               </div>
+
+              <div className="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
+                <p className="text-xs text-zinc-300">Nível mais usado</p>
+                <p className="font-bold mt-1">{nivelMaisUsado}</p>
+              </div>
             </div>
           </div>
 
@@ -348,24 +400,30 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <SectionCard title="Filtros e atalhos" subtitle="Escolha o período e acesse rapidamente os módulos principais">
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-zinc-600 mb-2">
-              Período
-            </label>
-            <select
-              value={periodo}
-              onChange={(e) => setPeriodo(e.target.value)}
-              className="border rounded-2xl p-3 w-full md:w-[280px]"
-            >
-              <option value="hoje">Hoje</option>
-              <option value="semana">Últimos 7 dias</option>
-              <option value="mes">Mês atual</option>
-            </select>
+      <SectionCard
+        title="Filtros e atalhos"
+        subtitle="Escolha o período e acesse rapidamente os módulos principais"
+      >
+        <div className="space-y-4">
+          <div className="flex flex-col md:flex-row md:items-start md:justify gap-4">
+            <div />
+            <div className="w-full md:w-[200px]">
+              <label className="block text-sm font-medium text-zinc-600 mb-2">
+                Período
+              </label>
+              <select
+                value={periodo}
+                onChange={(e) => setPeriodo(e.target.value)}
+                className="border rounded-2xl p-3 w-full"
+              >
+                <option value="hoje">Hoje</option>
+                <option value="semana">Últimos 7 dias</option>
+                <option value="mes">Mês atual</option>
+              </select>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
             <QuickAction
               title="Alunos"
               description="Gerenciar cadastros e fichas"
@@ -403,21 +461,24 @@ export default function DashboardPage() {
         <PremiumCard
           title="Alunos ativos"
           value={dados.alunosAtivos}
+          subtitle={`${taxaAtividade}% da base ativa`}
           icon={<UserCheck size={22} />}
+        />
+        <PremiumCard
+          title="Treinos no período"
+          value={totalTreinosPeriodo}
+          subtitle={periodo === "hoje" ? "Movimento de hoje" : "Total no período"}
+          icon={<Dumbbell size={22} />}
         />
         <PremiumCard
           title="Treinos hoje"
           value={dados.treinosHoje}
-          icon={<Dumbbell size={22} />}
-        />
-        <PremiumCard
-          title="Dia mais usado"
-          value={dados.diaMaisUsado || "-"}
+          subtitle="Últimas 24h / dia atual"
           icon={<CalendarDays size={22} />}
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <PremiumCard
           title="Mensalidades em aberto"
           value={dados.mensalidadesEmAberto}
@@ -428,7 +489,7 @@ export default function DashboardPage() {
         <PremiumCard
           title="Inadimplentes"
           value={dados.inadimplentes}
-          subtitle="Alunos com vencimento em aberto"
+          subtitle={`${taxaInadimplencia}% dos ativos`}
           icon={<AlertTriangle size={22} />}
           valueClassName="text-red-600"
         />
@@ -447,8 +508,39 @@ export default function DashboardPage() {
         />
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <PremiumCard
+          title="Personal mais ativo"
+          value={dados.personalMaisAtivo || "-"}
+          subtitle="Maior número de impressões"
+          icon={<Target size={22} />}
+        />
+        <PremiumCard
+          title="Dia mais usado"
+          value={dados.diaMaisUsado || "-"}
+          subtitle="Treino mais recorrente"
+          icon={<BarChart3 size={22} />}
+        />
+        <PremiumCard
+          title="Nível mais usado"
+          value={nivelMaisUsado}
+          subtitle="Maior participação no período"
+          icon={<Dumbbell size={22} />}
+        />
+        <PremiumCard
+          title="Risco de inadimplência"
+          value={`${taxaInadimplencia}%`}
+          subtitle="Baseado nos alunos ativos"
+          icon={<ShieldAlert size={22} />}
+          valueClassName={taxaInadimplencia > 20 ? "text-red-600" : "text-amber-600"}
+        />
+      </div>
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <SectionCard title="Treinos por dia" subtitle="Distribuição dos treinos no período selecionado">
+        <SectionCard
+          title="Treinos por dia"
+          subtitle="Distribuição dos treinos no período selecionado"
+        >
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dados.treinosPorDia}>
@@ -462,7 +554,10 @@ export default function DashboardPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Treinos por nível" subtitle="Participação dos níveis no período">
+        <SectionCard
+          title="Treinos por nível"
+          subtitle="Participação dos níveis no período"
+        >
           <div className="h-72">
             {pieData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-zinc-500">
@@ -472,7 +567,13 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Tooltip />
-                  <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={100} label>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={100}
+                    label
+                  >
                     {pieData.map((_, index) => (
                       <Cell key={index} fill={pieColors[index % pieColors.length]} />
                     ))}
@@ -484,8 +585,116 @@ export default function DashboardPage() {
         </SectionCard>
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <SectionCard
+          title="Treinos por horário"
+          subtitle="Descubra os horários de maior movimento"
+        >
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dados.treinosPorHorario}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="hora" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="total" radius={[10, 10, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Dias mais movimentados"
+          subtitle="Ranking dos dias com mais treinos"
+        >
+          {dados.diasMaisMovimentados.length === 0 ? (
+            <p className="text-sm text-zinc-500">Sem dados no período.</p>
+          ) : (
+            <div className="space-y-3">
+              {dados.diasMaisMovimentados.map((item, index) => (
+                <div
+                  key={`${item.dia}-${index}`}
+                  className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3 flex items-center justify-between gap-3"
+                >
+                  <div>
+                    <p className="font-semibold text-zinc-900">{item.dia}</p>
+                    <p className="text-sm text-zinc-500">Movimento no período</p>
+                  </div>
+
+                  <p className="font-black text-emerald-600">{item.total}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <SectionCard
+          title="Ranking de personal"
+          subtitle="Profissionais com mais treinos entregues"
+        >
+          {dados.rankingPersonal.length === 0 ? (
+            <p className="text-sm text-zinc-500">Sem dados no período.</p>
+          ) : (
+            <div className="space-y-3">
+              {dados.rankingPersonal.map((item, index) => (
+                <div
+                  key={`${item.nome}-${index}`}
+                  className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3 flex items-center justify-between gap-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center">
+                      <Trophy size={18} />
+                    </div>
+
+                    <div>
+                      <p className="font-semibold text-zinc-900">{item.nome}</p>
+                      <p className="text-sm text-zinc-500">Treinos entregues</p>
+                    </div>
+                  </div>
+
+                  <p className="font-black text-blue-600">{item.total}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Alunos que mais treinam"
+          subtitle="Quem mais recebeu treino no período"
+        >
+          {dados.alunosMaisTreinam.length === 0 ? (
+            <p className="text-sm text-zinc-500">Sem dados no período.</p>
+          ) : (
+            <div className="space-y-3">
+              {dados.alunosMaisTreinam.map((item, index) => (
+                <div
+                  key={`${item.nome}-${index}`}
+                  className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3 flex items-center justify-between gap-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center">
+                      <Users size={18} />
+                    </div>
+
+                    <div>
+                      <p className="font-semibold text-zinc-900">{item.nome}</p>
+                      <p className="text-sm text-zinc-500">Treinos recebidos</p>
+                    </div>
+                  </div>
+
+                  <p className="font-black text-violet-600">{item.total}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      </div>
+
       <SectionCard title="Financeiro" subtitle="Resumo consolidado do período">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-0 mb-2">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
           <PremiumCard
             title="Receita"
             value={formatBRL(dados.financeiro.receitaMes)}
@@ -554,7 +763,10 @@ export default function DashboardPage() {
           )}
         </SectionCard>
 
-        <SectionCard title="Alunos com vencimento em aberto" subtitle="Mensalidades vencidas ou pendentes">
+        <SectionCard
+          title="Alunos com vencimento em aberto"
+          subtitle="Mensalidades vencidas ou pendentes"
+        >
           {dados.alunosVencidos.length === 0 ? (
             <p className="text-sm text-zinc-500">Nenhum aluno vencido no momento.</p>
           ) : (
@@ -589,9 +801,17 @@ export default function DashboardPage() {
                 key={index}
                 className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-4"
               >
-                <p className="font-semibold text-zinc-900">{item.aluno}</p>
-                <p className="text-sm text-zinc-500 mt-1">{item.horario}</p>
-                <p className="text-sm text-zinc-600 mt-1">Treino {item.dia}</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center">
+                    <Clock3 size={18} />
+                  </div>
+
+                  <div>
+                    <p className="font-semibold text-zinc-900">{item.aluno}</p>
+                    <p className="text-sm text-zinc-500 mt-1">{item.horario}</p>
+                    <p className="text-sm text-zinc-600 mt-1">Treino {item.dia}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

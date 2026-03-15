@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import ProtegePagina from "@/components/ProtegePagina";
 import { Activity } from "lucide-react";
 import SystemLoader from "@/components/SystemLoader";
 import SystemError from "@/components/SystemError";
-
+import { apiFetch } from "@/lib/apiFetch";
 
 type Pagamento = {
   id: number;
@@ -18,9 +18,10 @@ type Pagamento = {
   data_pagamento?: string | null;
   status: string;
   forma_pagamento?: string | null;
+  gateway?: string | null;
+  gateway_status?: string | null;
+  link_pagamento?: string | null;
 };
-
-import { apiFetch } from "@/lib/apiFetch";
 
 function formatBRL(valor: number | undefined) {
   return Number(valor || 0).toLocaleString("pt-BR", {
@@ -34,6 +35,24 @@ function formatData(data?: string | null) {
   const dt = new Date(`${data}T00:00:00`);
   if (Number.isNaN(dt.getTime())) return data;
   return dt.toLocaleDateString("pt-BR");
+}
+
+function labelFormaPagamento(forma?: string | null) {
+  const valor = String(forma || "").trim();
+
+  const mapa: Record<string, string> = {
+    pix: "Pix",
+    cartao: "Cartão",
+    dinheiro: "Dinheiro",
+    boleto: "Boleto",
+    cartao_maquina: "Cartão máquina",
+    pix_manual: "Pix manual",
+    mercado_pago_pix: "Mercado Pago Pix",
+    mercado_pago_cartao: "Mercado Pago Cartão",
+    mercado_pago_boleto: "Mercado Pago Boleto",
+  };
+
+  return mapa[valor] || valor || "-";
 }
 
 function PagamentosPageContent() {
@@ -50,12 +69,15 @@ function PagamentosPageContent() {
 
   const [pagamentoSelecionado, setPagamentoSelecionado] =
     useState<Pagamento | null>(null);
-  const [formaPagamento, setFormaPagamento] = useState("pix");
+
+  const [formaPagamento, setFormaPagamento] = useState("pix_manual");
   const [salvandoPagamento, setSalvandoPagamento] = useState(false);
 
   const [pixQrCode, setPixQrCode] = useState("");
   const [pixCopiaECola, setPixCopiaECola] = useState("");
   const [gerandoPix, setGerandoPix] = useState(false);
+
+  const [gerandoCobrancaOnline, setGerandoCobrancaOnline] = useState(false);
 
   const carregarPagamentos = async () => {
     try {
@@ -92,19 +114,59 @@ function PagamentosPageContent() {
     init();
   }, [competencia, statusFiltro]);
 
-  const gerarPix = async (
-    alunoNome: string,
-    valor: number,
-    competencia: string
-  ) => {
+  const gerarPix = async () => {
+    try {
+      if (!pagamentoSelecionado) return;
+
+      setGerandoPix(true);
+
+      const chavePix = "79996320601";
+      const nome = "TREINOPRINT";
+      const cidade = "POCOVERDE";
+      const valorFormatado = Number(pagamentoSelecionado.valor || 0).toFixed(2);
+
+      const payload = `
+000201
+26360014BR.GOV.BCB.PIX
+0114${chavePix}
+52040000
+5303986
+54${valorFormatado.length}${valorFormatado}
+5802BR
+59${nome.length}${nome}
+60${cidade.length}${cidade}
+62070503***
+6304
+`
+        .replace(/\s/g, "");
+
+      const qr = await QRCode.toDataURL(payload);
+
+      setPixQrCode(qr);
+      setPixCopiaECola(payload);
+    } catch (error: any) {
+      alert(error?.message || "Erro ao gerar PIX");
+    } finally {
+      setGerandoPix(false);
+    }
+  };
+
+  const abrirRecebimento = async (item: Pagamento) => {
+    setPagamentoSelecionado(item);
+    setFormaPagamento("pix_manual");
+    setPixQrCode("");
+    setPixCopiaECola("");
+    await gerarPixComItem(item);
+  };
+
+  const gerarPixComItem = async (item: Pagamento) => {
     try {
       setGerandoPix(true);
 
       const chavePix = "79996320601";
       const nome = "TREINOPRINT";
       const cidade = "POCOVERDE";
-
-      const valorFormatado = Number(valor || 0).toFixed(2);
+      const valorFormatado = Number(item.valor || 0).toFixed(2);
 
       const payload = `
 000201
@@ -138,18 +200,23 @@ function PagamentosPageContent() {
     try {
       setSalvandoPagamento(true);
 
-      const res = await apiFetch(
-        `/api/financeiro/pagamentos/${pagamentoSelecionado.id}/marcar-pago`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            forma_pagamento: formaPagamento,
-          }),
-        }
-      );
+      const forma =
+        formaPagamento === "pix_manual" ||
+        formaPagamento === "cartao_maquina" ||
+        formaPagamento === "dinheiro"
+          ? formaPagamento
+          : formaPagamento;
+
+      const res = await apiFetch("/api/pagamentos/receber-manual", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          pagamento_id: pagamentoSelecionado.id,
+          forma_pagamento: forma,
+        }),
+      });
 
       const json = await res.json().catch(() => ({}));
 
@@ -159,13 +226,56 @@ function PagamentosPageContent() {
       }
 
       setPagamentoSelecionado(null);
-      setFormaPagamento("pix");
+      setFormaPagamento("pix_manual");
       setPixQrCode("");
       setPixCopiaECola("");
       await carregarPagamentos();
     } finally {
       setSalvandoPagamento(false);
     }
+  };
+
+  const gerarCobrancaOnline = async (item: Pagamento) => {
+    try {
+      setGerandoCobrancaOnline(true);
+
+      const res = await apiFetch("/api/pagamentos/mercadopago/criar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          pagamento_id: item.id,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(
+          (json as any).error ||
+            "Erro ao gerar cobrança online"
+        );
+        return;
+      }
+
+      await carregarPagamentos();
+
+      if ((json as any).init_point) {
+        window.open((json as any).init_point, "_blank");
+      }
+    } finally {
+      setGerandoCobrancaOnline(false);
+    }
+  };
+
+  const abrirLinkPagamento = (link?: string | null) => {
+    if (!link) {
+      alert("Link de pagamento ainda não gerado.");
+      return;
+    }
+
+    window.open(link, "_blank");
   };
 
   const estornarPagamento = async (id: number) => {
@@ -190,7 +300,7 @@ function PagamentosPageContent() {
     window.open(`/financeiro/comprovante/${id}`, "_blank");
   };
 
-    const pagamentosFiltrados = pagamentos.filter((item) =>
+  const pagamentosFiltrados = pagamentos.filter((item) =>
     item.aluno_nome.toLowerCase().includes(busca.toLowerCase())
   );
 
@@ -198,6 +308,12 @@ function PagamentosPageContent() {
     (acc, item) => acc + Number(item.valor || 0),
     0
   );
+
+  const totalPagoLista = useMemo(() => {
+    return pagamentosFiltrados
+      .filter((item) => item.status === "pago")
+      .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+  }, [pagamentosFiltrados]);
 
   if (loading) {
     return (
@@ -217,33 +333,34 @@ function PagamentosPageContent() {
       />
     );
   }
-  
+
   return (
-   <div className="space-y-6">
-    <section className="rounded-[32px] bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8 overflow-hidden relative">
-      <div className="absolute -right-10 -top-10 w-72 h-72 bg-[#7CFC00]/10 blur-3xl rounded-full" />
+    <div className="space-y-6">
+      <section className="rounded-[32px] bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8 overflow-hidden relative">
+        <div className="absolute -right-10 -top-10 w-72 h-72 bg-[#7CFC00]/10 blur-3xl rounded-full" />
 
-      <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
-        <div>
-          <p className="text-sm text-zinc-300">Painel principal</p>
-          <h1 className="text-3xl md:text-4xl font-black mt-2">
-            Bem-vindo ao Pagamentos
-          </h1>
-          <p className="text-zinc-300 mt-3 max-w-2xl">
-            Receba e gerencie as mensalidades dos alunos.
-          </p>
-        </div>
+        <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+          <div>
+            <p className="text-sm text-zinc-300">Painel principal</p>
+            <h1 className="text-3xl md:text-4xl font-black mt-2">
+              Bem-vindo ao Pagamentos
+            </h1>
+            <p className="text-zinc-300 mt-3 max-w-2xl">
+              Receba mensalidades no balcão ou gere cobranças online para os alunos.
+            </p>
+          </div>
 
-        <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
-          <p className="text-white/60 text-xs">Status do sistema</p>
-          <p className="text-xl font-black mt-1">TreinoPrint Online</p>
-         <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
+          <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
+            <p className="text-white/60 text-xs">Status do sistema</p>
+            <p className="text-xl font-black mt-1">TreinoPrint Online</p>
+            <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
               <Activity size={16} />
               Operação ativa
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+
       <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <input
@@ -278,7 +395,7 @@ function PagamentosPageContent() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl shadow p-5 border border-black/5">
           <p className="text-sm text-gray-500">Registros encontrados</p>
           <p className="text-2xl font-black mt-2 text-blue-600">
@@ -290,6 +407,13 @@ function PagamentosPageContent() {
           <p className="text-sm text-gray-500">Valor total da lista</p>
           <p className="text-2xl font-black mt-2 text-green-600">
             {formatBRL(totalLista)}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow p-5 border border-black/5">
+          <p className="text-sm text-gray-500">Total pago na lista</p>
+          <p className="text-2xl font-black mt-2 text-emerald-600">
+            {formatBRL(totalPagoLista)}
           </p>
         </div>
 
@@ -313,7 +437,7 @@ function PagamentosPageContent() {
             {pagamentosFiltrados.map((item) => (
               <div
                 key={item.id}
-                className="border rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+                className="border rounded-2xl p-4 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4"
               >
                 <div>
                   <p className="font-bold">{item.aluno_nome}</p>
@@ -336,23 +460,44 @@ function PagamentosPageContent() {
 
                   {item.forma_pagamento ? (
                     <p className="text-sm text-blue-600">
-                      Forma: {item.forma_pagamento}
+                      Forma: {labelFormaPagamento(item.forma_pagamento)}
+                    </p>
+                  ) : null}
+
+                  {item.gateway ? (
+                    <p className="text-sm text-violet-600">
+                      Gateway: {item.gateway} {item.gateway_status ? `• ${item.gateway_status}` : ""}
                     </p>
                   ) : null}
                 </div>
 
                 <div className="flex flex-wrap gap-3">
                   {item.status !== "pago" ? (
-                    <button
-                      onClick={() => {
-                        setPagamentoSelecionado(item);
-                        setFormaPagamento("pix");
-                        gerarPix(item.aluno_nome, item.valor, item.competencia);
-                      }}
-                      className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2"
-                    >
-                      Receber
-                    </button>
+                    <>
+                      <button
+                        onClick={() => abrirRecebimento(item)}
+                        className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2"
+                      >
+                        Receber no balcão
+                      </button>
+
+                      <button
+                        onClick={() => gerarCobrancaOnline(item)}
+                        disabled={gerandoCobrancaOnline}
+                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl px-4 py-2"
+                      >
+                        {gerandoCobrancaOnline ? "Gerando..." : "Gerar cobrança online"}
+                      </button>
+
+                      {item.link_pagamento ? (
+                        <button
+                          onClick={() => abrirLinkPagamento(item.link_pagamento)}
+                          className="border rounded-xl px-4 py-2"
+                        >
+                          Abrir link
+                        </button>
+                      ) : null}
+                    </>
                   ) : (
                     <>
                       <button
@@ -381,7 +526,7 @@ function PagamentosPageContent() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
             <h2 className="text-xl font-bold text-center">
-              Registrar pagamento
+              Recebimento no balcão
             </h2>
 
             <div className="text-sm text-gray-600 text-center">
@@ -392,38 +537,42 @@ function PagamentosPageContent() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={() => {
-                  setFormaPagamento("pix");
-                  gerarPix(
-                    pagamentoSelecionado.aluno_nome,
-                    pagamentoSelecionado.valor,
-                    pagamentoSelecionado.competencia
-                  );
+                  setFormaPagamento("pix_manual");
+                  gerarPix();
                 }}
                 className={`rounded-xl py-3 border font-medium ${
-                  formaPagamento === "pix"
+                  formaPagamento === "pix_manual"
                     ? "bg-green-600 text-white border-green-600"
                     : "bg-white"
                 }`}
               >
-                PIX
+                Pix manual
               </button>
 
               <button
-                onClick={() => setFormaPagamento("cartao")}
+                onClick={() => {
+                  setFormaPagamento("cartao_maquina");
+                  setPixQrCode("");
+                  setPixCopiaECola("");
+                }}
                 className={`rounded-xl py-3 border font-medium ${
-                  formaPagamento === "cartao"
+                  formaPagamento === "cartao_maquina"
                     ? "bg-blue-600 text-white border-blue-600"
                     : "bg-white"
                 }`}
               >
-                Cartão
+                Cartão máquina
               </button>
 
               <button
-                onClick={() => setFormaPagamento("dinheiro")}
+                onClick={() => {
+                  setFormaPagamento("dinheiro");
+                  setPixQrCode("");
+                  setPixCopiaECola("");
+                }}
                 className={`rounded-xl py-3 border font-medium ${
                   formaPagamento === "dinheiro"
                     ? "bg-yellow-500 text-white border-yellow-500"
@@ -432,23 +581,12 @@ function PagamentosPageContent() {
               >
                 Dinheiro
               </button>
-
-              <button
-                onClick={() => setFormaPagamento("boleto")}
-                className={`rounded-xl py-3 border font-medium ${
-                  formaPagamento === "boleto"
-                    ? "bg-gray-800 text-white border-gray-800"
-                    : "bg-white"
-                }`}
-              >
-                Boleto
-              </button>
             </div>
 
-            {formaPagamento === "pix" ? (
+            {formaPagamento === "pix_manual" ? (
               <div className="space-y-3 border rounded-2xl p-4 bg-gray-50">
                 <p className="text-sm font-semibold text-center">
-                  Pagamento via PIX
+                  Pagamento via Pix manual
                 </p>
 
                 {gerandoPix ? (
@@ -486,6 +624,16 @@ function PagamentosPageContent() {
               </div>
             ) : null}
 
+            <div className="rounded-2xl border bg-zinc-50 p-4 text-sm text-zinc-700">
+              {formaPagamento === "dinheiro" ? (
+                <p>Confirme somente após receber o valor em dinheiro no balcão.</p>
+              ) : formaPagamento === "cartao_maquina" ? (
+                <p>Confirme somente após passar o cartão na máquina física e aprovar a cobrança.</p>
+              ) : (
+                <p>Confirme somente após o aluno concluir o Pix manualmente.</p>
+              )}
+            </div>
+
             <div className="flex gap-3">
               <button
                 onClick={confirmarPagamento}
@@ -498,7 +646,7 @@ function PagamentosPageContent() {
               <button
                 onClick={() => {
                   setPagamentoSelecionado(null);
-                  setFormaPagamento("pix");
+                  setFormaPagamento("pix_manual");
                   setPixQrCode("");
                   setPixCopiaECola("");
                 }}
