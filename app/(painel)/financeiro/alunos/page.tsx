@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/apiFetch";
 
 type TipoCobranca = "mensal" | "trimestral" | "semestral" | "anual";
 
@@ -27,8 +28,6 @@ type Plano = {
   limite_alunos?: number | null;
   ativo: boolean;
 };
-
-import { apiFetch } from "@/lib/apiFetch";
 
 function BadgeConfiguracao({
   valor,
@@ -89,12 +88,12 @@ export default function FinanceiroAlunosPage() {
       const jsonPlanos = await resPlanos.json().catch(() => []);
 
       if (!resLista.ok) {
-        setErro(jsonLista.error || "Erro ao carregar alunos do financeiro");
+        setErro((jsonLista as any).error || "Erro ao carregar alunos do financeiro");
         return;
       }
 
       if (!resPlanos.ok) {
-        setErro(jsonPlanos.error || "Erro ao carregar planos");
+        setErro((jsonPlanos as any).error || "Erro ao carregar planos");
         return;
       }
 
@@ -120,19 +119,46 @@ export default function FinanceiroAlunosPage() {
     init();
   }, []);
 
+  const planoPorCodigo = (codigo?: string | null) =>
+    planos.find((p) => p.codigo === codigo);
+
   const atualizarCampo = (
     aluno_id: number,
     campo: keyof AlunoFinanceiro,
     valor: string | number | boolean | null
   ) => {
     setLista((prev) =>
-      prev.map((item) =>
-        item.aluno_id === aluno_id ? { ...item, [campo]: valor } : item
-      )
+      prev.map((item) => {
+        if (item.aluno_id !== aluno_id) return item;
+
+        const atualizado = { ...item, [campo]: valor };
+
+        if (campo === "plano_codigo") {
+          const planoSelecionado = planoPorCodigo(String(valor || ""));
+          return {
+            ...atualizado,
+            valor_mensalidade: planoSelecionado ? Number(planoSelecionado.valor || 0) : 0,
+            tipo_cobranca: planoSelecionado?.tipo_cobranca || "mensal",
+          };
+        }
+
+        return atualizado;
+      })
     );
   };
 
   const salvarItem = async (item: AlunoFinanceiro) => {
+    const planoSelecionado = planoPorCodigo(item.plano_codigo);
+
+    const valorMensalidade = planoSelecionado
+      ? Number(planoSelecionado.valor || 0)
+      : Number(item.valor_mensalidade || 0);
+
+    const tipoCobranca =
+      planoSelecionado?.tipo_cobranca || item.tipo_cobranca || "mensal";
+
+    const planoNome = planoSelecionado?.nome || "";
+
     const res = await apiFetch("/api/financeiro/alunos/salvar", {
       method: "POST",
       headers: {
@@ -140,7 +166,10 @@ export default function FinanceiroAlunosPage() {
       },
       body: JSON.stringify({
         aluno_id: item.aluno_id,
-        plano_codigo: item.plano_codigo,
+        plano: planoNome || null,
+        plano_codigo: item.plano_codigo || null,
+        valor_mensalidade: valorMensalidade,
+        tipo_cobranca: tipoCobranca,
         vencimento_dia: Number(item.vencimento_dia || 10),
         ativo: item.ativo,
       }),
@@ -149,7 +178,7 @@ export default function FinanceiroAlunosPage() {
     const json = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      alert(json.error || `Erro ao salvar ${item.nome}`);
+      alert((json as any).error || `Erro ao salvar ${item.nome}`);
       return false;
     }
 
@@ -181,12 +210,21 @@ export default function FinanceiroAlunosPage() {
       return;
     }
 
+    const planoSelecionado = planoPorCodigo(planoTodos);
+
+    if (!planoSelecionado) {
+      alert("Plano selecionado inválido");
+      return;
+    }
+
     setAplicandoTodos(true);
 
     setLista((prev) =>
       prev.map((item) => ({
         ...item,
         plano_codigo: planoTodos,
+        valor_mensalidade: Number(planoSelecionado.valor || 0),
+        tipo_cobranca: planoSelecionado.tipo_cobranca,
         vencimento_dia: Number(vencimentoTodos || 10),
         ativo: ativoTodos,
       }))
@@ -212,9 +250,6 @@ export default function FinanceiroAlunosPage() {
       );
     });
   }, [lista, busca]);
-
-  const planoPorCodigo = (codigo?: string | null) =>
-    planos.find((p) => p.codigo === codigo);
 
   if (loading) {
     return <p className="p-6">Carregando...</p>;
@@ -398,6 +433,11 @@ export default function FinanceiroAlunosPage() {
                               style: "currency",
                               currency: "BRL",
                             })
+                          : item.valor_mensalidade > 0
+                          ? Number(item.valor_mensalidade).toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })
                           : "-"
                       }
                       className="border rounded-xl p-2 w-full bg-gray-100"
@@ -411,7 +451,7 @@ export default function FinanceiroAlunosPage() {
                     <input
                       type="text"
                       disabled
-                      value={planoSelecionado?.tipo_cobranca || "-"}
+                      value={planoSelecionado?.tipo_cobranca || item.tipo_cobranca || "-"}
                       className="border rounded-xl p-2 w-full bg-gray-100"
                     />
                   </div>

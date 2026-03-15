@@ -2,29 +2,29 @@ export async function apiFetchAluno(
   input: RequestInfo | URL,
   init?: RequestInit
 ) {
-  const alunoId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("treinoprint_app_aluno_id") ||
-        localStorage.getItem("treinoprint_aluno_id") ||
-        localStorage.getItem("aluno_id")
-      : null;
+  let alunoId = null;
+  let academiaId = null;
 
-  const academiaId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("treinoprint_app_academia_id") ||
-        localStorage.getItem("treinoprint_academia_id") ||
-        localStorage.getItem("academia_id")
-      : null;
+  if (typeof window !== "undefined") {
+    alunoId =
+      localStorage.getItem("treinoprint_app_aluno_id") ||
+      localStorage.getItem("treinoprint_aluno_id");
+
+    academiaId =
+      localStorage.getItem("treinoprint_app_academia_id") ||
+      localStorage.getItem("treinoprint_aluno_academia_id") ||
+      localStorage.getItem("treinoprint_academia_id");
+  }
 
   const headers = new Headers(init?.headers || {});
 
   if (alunoId) {
-    headers.set("x-aluno-id", String(alunoId));
-    headers.set("x-app-aluno-id", String(alunoId));
+    headers.set("x-aluno-id", alunoId);
+    headers.set("x-app-aluno-id", alunoId);
   }
 
   if (academiaId) {
-    headers.set("x-academia-id", String(academiaId));
+    headers.set("x-academia-id", academiaId);
   }
 
   return fetch(input, {

@@ -47,6 +47,7 @@ function labelFormaPagamento(forma?: string | null) {
     boleto: "Boleto",
     cartao_maquina: "Cartão máquina",
     pix_manual: "Pix manual",
+    mercado_pago: "Mercado Pago",
     mercado_pago_pix: "Mercado Pago Pix",
     mercado_pago_cartao: "Mercado Pago Cartão",
     mercado_pago_boleto: "Mercado Pago Boleto",
@@ -58,6 +59,11 @@ function labelFormaPagamento(forma?: string | null) {
 function PagamentosPageContent() {
   const hoje = new Date();
   const competenciaAtual = hoje.toISOString().slice(0, 7);
+
+  const academiaId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("treinoprint_academia_id") || ""
+      : "";
 
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +84,7 @@ function PagamentosPageContent() {
   const [gerandoPix, setGerandoPix] = useState(false);
 
   const [gerandoCobrancaOnline, setGerandoCobrancaOnline] = useState(false);
+  const [gerandoCobrancasMes, setGerandoCobrancasMes] = useState(false);
 
   const carregarPagamentos = async () => {
     try {
@@ -151,14 +158,6 @@ function PagamentosPageContent() {
     }
   };
 
-  const abrirRecebimento = async (item: Pagamento) => {
-    setPagamentoSelecionado(item);
-    setFormaPagamento("pix_manual");
-    setPixQrCode("");
-    setPixCopiaECola("");
-    await gerarPixComItem(item);
-  };
-
   const gerarPixComItem = async (item: Pagamento) => {
     try {
       setGerandoPix(true);
@@ -194,18 +193,19 @@ function PagamentosPageContent() {
     }
   };
 
+  const abrirRecebimento = async (item: Pagamento) => {
+    setPagamentoSelecionado(item);
+    setFormaPagamento("pix_manual");
+    setPixQrCode("");
+    setPixCopiaECola("");
+    await gerarPixComItem(item);
+  };
+
   const confirmarPagamento = async () => {
     if (!pagamentoSelecionado) return;
 
     try {
       setSalvandoPagamento(true);
-
-      const forma =
-        formaPagamento === "pix_manual" ||
-        formaPagamento === "cartao_maquina" ||
-        formaPagamento === "dinheiro"
-          ? formaPagamento
-          : formaPagamento;
 
       const res = await apiFetch("/api/pagamentos/receber-manual", {
         method: "POST",
@@ -214,7 +214,7 @@ function PagamentosPageContent() {
         },
         body: JSON.stringify({
           pagamento_id: pagamentoSelecionado.id,
-          forma_pagamento: forma,
+          forma_pagamento: formaPagamento,
         }),
       });
 
@@ -252,20 +252,55 @@ function PagamentosPageContent() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        alert(
-          (json as any).error ||
-            "Erro ao gerar cobrança online"
-        );
+        alert((json as any).error || "Erro ao gerar cobrança online");
         return;
       }
 
       await carregarPagamentos();
 
-      if ((json as any).init_point) {
+      if ((json as any).link) {
+        window.open((json as any).link, "_blank");
+      } else if ((json as any).init_point) {
         window.open((json as any).init_point, "_blank");
+      } else {
+        alert("Cobrança gerada com sucesso");
       }
     } finally {
       setGerandoCobrancaOnline(false);
+    }
+  };
+
+  const gerarCobrancasDoMes = async () => {
+    try {
+      if (!academiaId) {
+        alert("Academia não identificada");
+        return;
+      }
+
+      setGerandoCobrancasMes(true);
+
+      const res = await apiFetch("/api/pagamentos/mercadopago/gerar-mes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          competencia,
+          academia_id: academiaId,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert((json as any).error || "Erro ao gerar cobranças do mês");
+        return;
+      }
+
+      alert(`${(json as any).total_gerado || 0} cobranças criadas`);
+      await carregarPagamentos();
+    } finally {
+      setGerandoCobrancasMes(false);
     }
   };
 
@@ -362,7 +397,7 @@ function PagamentosPageContent() {
       </section>
 
       <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <input
             type="month"
             value={competencia}
@@ -391,6 +426,14 @@ function PagamentosPageContent() {
             className="bg-black text-white rounded-xl px-5 py-3"
           >
             Atualizar
+          </button>
+
+          <button
+            onClick={gerarCobrancasDoMes}
+            disabled={gerandoCobrancasMes}
+            className="bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white rounded-xl px-5 py-3"
+          >
+            {gerandoCobrancasMes ? "Gerando..." : "Gerar cobranças do mês"}
           </button>
         </div>
       </section>
@@ -466,7 +509,8 @@ function PagamentosPageContent() {
 
                   {item.gateway ? (
                     <p className="text-sm text-violet-600">
-                      Gateway: {item.gateway} {item.gateway_status ? `• ${item.gateway_status}` : ""}
+                      Gateway: {item.gateway}
+                      {item.gateway_status ? ` • ${item.gateway_status}` : ""}
                     </p>
                   ) : null}
                 </div>
@@ -474,29 +518,29 @@ function PagamentosPageContent() {
                 <div className="flex flex-wrap gap-3">
                   {item.status !== "pago" ? (
                     <>
-                      <button
-                        onClick={() => abrirRecebimento(item)}
-                        className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2"
-                      >
-                        Receber no balcão
-                      </button>
-
-                      <button
-                        onClick={() => gerarCobrancaOnline(item)}
-                        disabled={gerandoCobrancaOnline}
-                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl px-4 py-2"
-                      >
-                        {gerandoCobrancaOnline ? "Gerando..." : "Gerar cobrança online"}
-                      </button>
-
-                      {item.link_pagamento ? (
+                      {!item.link_pagamento ? (
+                        <button
+                          onClick={() => gerarCobrancaOnline(item)}
+                          disabled={gerandoCobrancaOnline}
+                          className="bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white rounded-xl px-4 py-2"
+                        >
+                          {gerandoCobrancaOnline ? "Gerando..." : "Gerar cobrança online"}
+                        </button>
+                      ) : (
                         <button
                           onClick={() => abrirLinkPagamento(item.link_pagamento)}
                           className="border rounded-xl px-4 py-2"
                         >
                           Abrir link
                         </button>
-                      ) : null}
+                      )}
+
+                      <button
+                        onClick={() => abrirRecebimento(item)}
+                        className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2"
+                      >
+                        Receber no balcão
+                      </button>
                     </>
                   ) : (
                     <>

@@ -49,21 +49,30 @@ export default function LoginAlunoPage() {
         return;
       }
 
+      const alunoId = String((json as any).sessao?.aluno_id || "");
+      const academiaId = String((json as any).sessao?.academia_id || "");
+      const alunoNome = String((json as any).aluno?.nome || "");
+
+      if (!alunoId || !academiaId) {
+        setErro("Sessão do aluno inválida");
+        return;
+      }
+
       localStorage.setItem("treinoprint_aluno_logado", "1");
-      localStorage.setItem(
-        "treinoprint_aluno_id",
-        String((json as any).sessao.aluno_id)
-      );
-      localStorage.setItem(
-        "treinoprint_aluno_academia_id",
-        String((json as any).sessao.academia_id)
-      );
-      localStorage.setItem(
-        "treinoprint_aluno_nome",
-        String((json as any).aluno.nome || "")
-      );
+
+      // nomes antigos
+      localStorage.setItem("treinoprint_aluno_id", alunoId);
+      localStorage.setItem("treinoprint_aluno_academia_id", academiaId);
+
+      // nomes novos/padronizados
+      localStorage.setItem("treinoprint_app_aluno_id", alunoId);
+      localStorage.setItem("treinoprint_app_academia_id", academiaId);
+
+      localStorage.setItem("treinoprint_aluno_nome", alunoNome);
 
       router.push("/app-aluno/inicio");
+    } catch {
+      setErro("Erro ao entrar");
     } finally {
       setLoading(false);
     }
