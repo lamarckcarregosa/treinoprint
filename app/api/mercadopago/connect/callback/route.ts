@@ -8,7 +8,9 @@ export async function GET(req: NextRequest) {
     const state = url.searchParams.get("state");
 
     if (!code || !state) {
-      return NextResponse.redirect(new URL("/sistema/academia?mp=erro", req.url));
+      return NextResponse.redirect(
+        new URL("/configuracoes/academia?mp=erro", req.url)
+      );
     }
 
     const clientId = process.env.MP_CLIENT_ID!;
@@ -32,7 +34,10 @@ export async function GET(req: NextRequest) {
     const tokenJson = await tokenRes.json();
 
     if (!tokenRes.ok) {
-      return NextResponse.redirect(new URL("/sistema/academia?mp=erro", req.url));
+      console.error("Erro token Mercado Pago:", tokenJson);
+      return NextResponse.redirect(
+        new URL("/configuracoes/academia?mp=erro", req.url)
+      );
     }
 
     const academiaId = state;
@@ -54,11 +59,20 @@ export async function GET(req: NextRequest) {
       .eq("id", academiaId);
 
     if (error) {
-      return NextResponse.redirect(new URL("/sistema/academia?mp=erro", req.url));
+      console.error("Erro ao salvar conexão MP:", error);
+      return NextResponse.redirect(
+        new URL("/configuracoes/academia?mp=erro", req.url)
+      );
     }
 
-    return NextResponse.redirect(new URL("/sistema/academia?mp=ok", req.url));
-  } catch {
-    return NextResponse.redirect(new URL("/sistema/academia?mp=erro", req.url));
+    return NextResponse.redirect(
+      new URL("/configuracoes/academia?mp=ok", req.url)
+    );
+  } catch (error) {
+    console.error("Callback Mercado Pago erro:", error);
+
+    return NextResponse.redirect(
+      new URL("/configuracoes/academia?mp=erro", req.url)
+    );
   }
 }

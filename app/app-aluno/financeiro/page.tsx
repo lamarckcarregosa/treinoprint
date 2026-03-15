@@ -11,6 +11,9 @@ type Pagamento = {
   data_pagamento?: string | null;
   status: string;
   forma_pagamento?: string | null;
+  gateway?: string | null;
+  gateway_status?: string | null;
+  link_pagamento?: string | null;
 };
 
 function formatBRL(valor: number | undefined) {
@@ -28,6 +31,48 @@ function formatData(data?: string | null) {
 
   if (Number.isNaN(dt.getTime())) return data;
   return dt.toLocaleDateString("pt-BR");
+}
+
+function labelFormaPagamento(forma?: string | null) {
+  const valor = String(forma || "").trim();
+
+  const mapa: Record<string, string> = {
+    pix: "Pix",
+    cartao: "Cartão",
+    dinheiro: "Dinheiro",
+    boleto: "Boleto",
+    cartao_maquina: "Cartão máquina",
+    pix_manual: "Pix manual",
+    mercado_pago_pix: "Mercado Pago Pix",
+    mercado_pago_cartao: "Mercado Pago Cartão",
+    mercado_pago_boleto: "Mercado Pago Boleto",
+  };
+
+  return mapa[valor] || valor || "-";
+}
+
+function labelStatus(status?: string | null) {
+  const valor = String(status || "").trim().toLowerCase();
+
+  if (valor === "pago") return "Pago";
+  if (valor === "pendente") return "Pendente";
+  if (valor === "vencido") return "Vencido";
+
+  return status || "-";
+}
+
+function corStatus(status?: string | null) {
+  const valor = String(status || "").trim().toLowerCase();
+
+  if (valor === "pago") {
+    return "bg-green-100 text-green-700";
+  }
+
+  if (valor === "vencido") {
+    return "bg-red-100 text-red-700";
+  }
+
+  return "bg-yellow-100 text-yellow-700";
 }
 
 export default function FinanceiroAlunoPage() {
@@ -78,6 +123,23 @@ export default function FinanceiroAlunoPage() {
     [lista]
   );
 
+  const mensalidadeAtual = useMemo(() => {
+    return (
+      lista.find((item) => item.status !== "pago") ||
+      lista[0] ||
+      null
+    );
+  }, [lista]);
+
+  const abrirPagamento = (item: Pagamento) => {
+    if (!item.link_pagamento) {
+      alert("Link de pagamento ainda não disponível.");
+      return;
+    }
+
+    window.open(item.link_pagamento, "_blank");
+  };
+
   if (loading) return <p className="p-4">Carregando...</p>;
 
   return (
@@ -85,7 +147,7 @@ export default function FinanceiroAlunoPage() {
       <section className="bg-white rounded-2xl shadow p-5">
         <h1 className="text-xl font-black text-gray-900">Meu financeiro</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Mensalidades pagas e pendentes
+          Mensalidades pagas, pendentes e cobranças online
         </p>
       </section>
 
@@ -104,6 +166,68 @@ export default function FinanceiroAlunoPage() {
           </p>
         </div>
       </section>
+
+      {mensalidadeAtual ? (
+        <section className="bg-white rounded-2xl shadow p-5 border border-black/5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-gray-500">Mensalidade atual</p>
+              <p className="text-lg font-black text-gray-900 mt-1">
+                {mensalidadeAtual.competencia}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                Vencimento: {formatData(mensalidadeAtual.vencimento)}
+              </p>
+              <p className="text-sm text-gray-600">
+                Valor: {formatBRL(mensalidadeAtual.valor)}
+              </p>
+            </div>
+
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-semibold ${corStatus(
+                mensalidadeAtual.status
+              )}`}
+            >
+              {labelStatus(mensalidadeAtual.status)}
+            </span>
+          </div>
+
+          {mensalidadeAtual.status !== "pago" ? (
+            <div className="mt-4 flex flex-wrap gap-3">
+              {mensalidadeAtual.link_pagamento ? (
+                <>
+                  <button
+                    onClick={() => abrirPagamento(mensalidadeAtual)}
+                    className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-3 font-medium"
+                  >
+                    Pagar agora
+                  </button>
+
+                  <button
+                    onClick={() => abrirPagamento(mensalidadeAtual)}
+                    className="border rounded-xl px-4 py-3 font-medium"
+                  >
+                    Abrir link
+                  </button>
+                </>
+              ) : (
+                <div className="rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-700">
+                  Sua academia ainda não gerou uma cobrança online para esta mensalidade.
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {mensalidadeAtual.gateway ? (
+            <p className="text-xs text-violet-600 mt-4">
+              Cobrança online: {mensalidadeAtual.gateway}
+              {mensalidadeAtual.gateway_status
+                ? ` • ${mensalidadeAtual.gateway_status}`
+                : ""}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {erro ? (
         <div className="bg-white rounded-2xl shadow p-5">
@@ -131,12 +255,12 @@ export default function FinanceiroAlunoPage() {
                     Valor: {formatBRL(item.valor)}
                   </p>
                   <p className="text-sm text-gray-600">
-                    Status: {item.status}
+                    Status: {labelStatus(item.status)}
                   </p>
 
                   {item.forma_pagamento ? (
                     <p className="text-sm text-blue-600">
-                      Forma: {item.forma_pagamento}
+                      Forma: {labelFormaPagamento(item.forma_pagamento)}
                     </p>
                   ) : null}
 
@@ -145,18 +269,41 @@ export default function FinanceiroAlunoPage() {
                       Pago em: {formatData(item.data_pagamento)}
                     </p>
                   ) : null}
+
+                  {item.gateway ? (
+                    <p className="text-sm text-violet-600">
+                      Cobrança online: {item.gateway}
+                      {item.gateway_status ? ` • ${item.gateway_status}` : ""}
+                    </p>
+                  ) : null}
                 </div>
 
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    item.status === "pago"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold ${corStatus(
+                    item.status
+                  )}`}
                 >
-                  {item.status}
+                  {labelStatus(item.status)}
                 </span>
               </div>
+
+              {item.status !== "pago" && item.link_pagamento ? (
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    onClick={() => abrirPagamento(item)}
+                    className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2 text-sm font-medium"
+                  >
+                    Pagar agora
+                  </button>
+
+                  <button
+                    onClick={() => abrirPagamento(item)}
+                    className="border rounded-xl px-4 py-2 text-sm font-medium"
+                  >
+                    Abrir link
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))
         )}
