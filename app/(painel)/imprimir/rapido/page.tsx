@@ -8,59 +8,62 @@ type Exercicio = {
   series?: string;
   repeticoes?: string;
   carga?: string;
+  descanso?: string;
   obs?: string;
-};
-
-type Aluno = {
-  id: number;
-  nome: string;
-};
-
-type Treino = {
-  id: number;
-  semana?: string;
-  dia?: string;
-  nivel?: string;
-  tipo?: string;
-  exercicios?: Exercicio[];
 };
 
 export default function ImpressaoRapidaPage() {
   const [logoAcademia, setLogoAcademia] = useState("");
   const [nomeAcademia, setNomeAcademia] = useState("");
-
-  const [nomeAluno, setNomeAluno] = useState("");
-  const [nomePersonal, setNomePersonal] = useState("");
-
-  const [diaTreino, setDiaTreino] = useState("");
-  const [nivelTreino, setNivelTreino] = useState("");
-  const [tipoTreino, setTipoTreino] = useState("");
-
   const [exercicios, setExercicios] = useState<Exercicio[]>([]);
-
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [tituloTreino, setTituloTreino] = useState("TREINO PERSONALIZADO");
+  const [personalNome, setPersonalNome] = useState("");
+  const [objetivo, setObjetivo] = useState("");
+  const [observacoesGerais, setObservacoesGerais] = useState("");
+  const [codigoTreinoAtual, setCodigoTreinoAtual] = useState("");
+  const [diaSemanaAtual, setDiaSemanaAtual] = useState("");
+  const [historicoSalvo, setHistoricoSalvo] = useState(false);
+  const inicializadoRef = useRef(false);
+const imprimindoRef = useRef(false);
 
-  const jaProcessouRef = useRef(false);
-
-  const params = useMemo(() => new URLSearchParams(window.location.search), []);
+  const params = useMemo(() => {
+    if (typeof window === "undefined") return new URLSearchParams();
+    return new URLSearchParams(window.location.search);
+  }, []);
 
   const alunoId = params.get("aluno_id") || "";
+  const aluno = params.get("aluno") || "";
   const treinoId = params.get("treino_id") || "";
-  const origem = params.get("origem") || "";
-  const autoPrint = params.get("auto_print") || "";
-  const personalNomeParam = params.get("personal_nome") || "";
+  const dia = params.get("dia") || "";
+  const tipo = params.get("tipo") || "";
+  const nivel = params.get("nivel") || "";
+  const codigoTreino = params.get("codigo_treino") || "";
+  const diaSemana = params.get("dia_semana") || "";
+  const personalParam = params.get("personal_nome") || "";
+  const autoPrint = params.get("auto_print") === "1";
 
-  const registrarHistorico = async (
-    alunoNome: string,
-    personalNome: string,
-    treinoObj: Treino
-  ) => {
+  const semanaAtual = useMemo(() => {
+    const hoje = new Date();
+    return hoje.toISOString().slice(0, 10);
+  }, []);
+
+  const salvarHistoricoAntesDeImprimir = async (dados: {
+    exercicios: Exercicio[];
+    personalNome?: string;
+    codigoTreinoAtual?: string;
+    diaSemanaAtual?: string;
+  }) => {
     try {
-      const userId =
-        typeof window !== "undefined"
-          ? localStorage.getItem("treinoprint_user_id")
-          : null;
+      if (historicoSalvo) return;
+      if (!aluno || !Array.isArray(dados.exercicios) || dados.exercicios.length === 0) {
+        return;
+      }
+
+      const origemHistorico = dados.codigoTreinoAtual
+        ? "treino_personalizado"
+        : "padrao";
 
       await apiFetch("/api/historico-impressoes", {
         method: "POST",
@@ -68,110 +71,290 @@ export default function ImpressaoRapidaPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          aluno_nome: alunoNome,
-          personal_nome: personalNome || null,
-          semana: treinoObj.semana || null,
-          dia: treinoObj.dia || null,
-          nivel: treinoObj.nivel || null,
-          tipo: treinoObj.tipo || null,
-          exercicios: treinoObj.exercicios || [],
-          user_id: userId || null,
+          aluno_id: alunoId ? Number(alunoId) : null,
+          aluno_nome: aluno,
+          personal_nome: dados.personalNome || null,
+          semana: null,
+          dia: dados.diaSemanaAtual || dia || null,
+          nivel: nivel || null,
+          tipo: tipo || null,
+          exercicios: dados.exercicios,
+          origem: origemHistorico,
+          codigo_treino: dados.codigoTreinoAtual || null,
         }),
       });
+
+      setHistoricoSalvo(true);
     } catch (error) {
-      console.error("Erro ao registrar histórico:", error);
+      console.error("Erro ao salvar histórico da impressão rápida:", error);
     }
   };
 
+ const dispararPrint = async (dados: {
+  exercicios: Exercicio[];
+  personalNome?: string;
+  codigoTreinoAtual?: string;
+  diaSemanaAtual?: string;
+}) => {
+  if (!autoPrint) return;
+  if (imprimindoRef.current) return;
+
+  imprimindoRef.current = true;
+
+  await salvarHistoricoAntesDeImprimir(dados);
+
+  setTimeout(() => {
+    window.print();
+  }, 700);
+};
+
   useEffect(() => {
-    if (jaProcessouRef.current) return;
-    jaProcessouRef.current = true;
+  const carregar = async () => {
+  try {
+    if (inicializadoRef.current) return;
+    inicializadoRef.current = true;
 
-    const carregar = async () => {
-      try {
-        setLoading(true);
-        setErro("");
+    setLoading(true);
+    setErro("");
+    setHistoricoSalvo(false);
 
-        if (!alunoId) {
-          setErro("Aluno não informado.");
-          return;
+        if (personalParam) {
+          setPersonalNome(personalParam);
         }
 
-        if (!treinoId) {
-          setErro("Treino não informado.");
-          return;
-        }
-
-        const [resAcademia, resAluno, resTreino] = await Promise.all([
-          apiFetch("/api/minha-academia", { cache: "no-store" }),
-          apiFetch(`/api/alunos/${alunoId}`, { cache: "no-store" }),
-          apiFetch(`/api/treinos/${treinoId}`, { cache: "no-store" }),
-        ]);
+        const resAcademia = await apiFetch("/api/minha-academia", {
+          cache: "no-store",
+        });
 
         const jsonAcademia = await resAcademia.json().catch(() => ({}));
-        const jsonAluno = await resAluno.json().catch(() => ({}));
-        const jsonTreino = await resTreino.json().catch(() => ({}));
 
         if (!resAcademia.ok) {
           setErro((jsonAcademia as any).error || "Erro ao carregar academia");
           return;
         }
 
-        if (!resAluno.ok) {
-          setErro((jsonAluno as any).error || "Erro ao carregar aluno");
-          return;
-        }
-
-        if (!resTreino.ok) {
-          setErro((jsonTreino as any).error || "Erro ao carregar treino");
-          return;
-        }
-
-        const alunoObj = jsonAluno as Aluno;
-        const treinoObj = jsonTreino as Treino;
-
         setLogoAcademia((jsonAcademia as any).logo_url || "");
         setNomeAcademia((jsonAcademia as any).nome || "");
 
-        setNomeAluno(alunoObj?.nome || "");
+        // 1) prioridade total: treino padrão selecionado por treino_id
+        if (treinoId) {
+          const resTreinos = await apiFetch("/api/treinos", {
+            cache: "no-store",
+          });
 
-        const personalFinal =
-          personalNomeParam ||
-          (typeof window !== "undefined"
-            ? localStorage.getItem("treinoprint_nome") || ""
-            : "");
+          const jsonTreinos = await resTreinos.json().catch(() => []);
 
-        setNomePersonal(personalFinal || "-");
+          if (!resTreinos.ok) {
+            setErro((jsonTreinos as any).error || "Erro ao carregar treino padrão");
+            return;
+          }
 
-        setDiaTreino(treinoObj?.dia || "");
-        setNivelTreino(treinoObj?.nivel || "");
-        setTipoTreino(treinoObj?.tipo || "");
+          const treinoSelecionado = Array.isArray(jsonTreinos)
+            ? jsonTreinos.find((item: any) => String(item.id) === String(treinoId))
+            : null;
 
-        setExercicios(
-          Array.isArray(treinoObj?.exercicios) ? treinoObj.exercicios : []
-        );
+          if (treinoSelecionado) {
+            const exerciciosCarregados = Array.isArray(treinoSelecionado.exercicios)
+              ? treinoSelecionado.exercicios
+              : [];
 
-        await registrarHistorico(
-          alunoObj?.nome || "",
-          personalFinal || "",
-          treinoObj
-        );
+            setTituloTreino(
+              `TREINO ${treinoSelecionado.dia || dia || ""}`.trim() ||
+                "TREINO PERSONALIZADO"
+            );
+            setPersonalNome(personalParam || "");
+            setObjetivo("");
+            setObservacoesGerais("");
+            setCodigoTreinoAtual("");
+            setDiaSemanaAtual(treinoSelecionado.dia || dia || "");
+            setExercicios(exerciciosCarregados);
 
-        if (autoPrint === "1" || origem === "catraca") {
-          setTimeout(() => {
-            window.print();
-          }, 700);
+            await dispararPrint({
+              exercicios: exerciciosCarregados,
+              personalNome: personalParam || "",
+              codigoTreinoAtual: "",
+              diaSemanaAtual: treinoSelecionado.dia || dia || "",
+            });
+
+            return;
+          }
         }
-      } catch (error) {
-        console.error(error);
-        setErro("Erro ao preparar impressão.");
+
+        // 2) tenta treino personalizado específico
+        if (alunoId && (codigoTreino || diaSemana)) {
+          const qp = new URLSearchParams({
+            aluno_id: alunoId,
+          });
+
+          if (codigoTreino) qp.set("codigo_treino", codigoTreino);
+          if (diaSemana) qp.set("dia_semana", diaSemana);
+
+          const resPersonalizado = await apiFetch(
+            `/api/treinos-personalizados/ativo?${qp.toString()}`,
+            { cache: "no-store" }
+          );
+
+          const jsonPersonalizado = await resPersonalizado.json().catch(() => null);
+
+          if (
+            resPersonalizado.ok &&
+            jsonPersonalizado &&
+            Array.isArray(jsonPersonalizado.itens) &&
+            jsonPersonalizado.itens.length > 0
+          ) {
+            const personalFinal = personalParam || jsonPersonalizado.personal_nome || "";
+            const codigoFinal = jsonPersonalizado.codigo_treino || "";
+            const diaFinal = jsonPersonalizado.dia_semana || "";
+            const exerciciosCarregados = (jsonPersonalizado.itens || []).map((item: any) => ({
+              nome: item.nome,
+              series: item.series || "",
+              repeticoes: item.repeticoes || "",
+              carga: item.carga || "",
+              descanso: item.descanso || "",
+              obs: item.obs || "",
+            }));
+
+            setTituloTreino(jsonPersonalizado.titulo || "TREINO PERSONALIZADO");
+            setPersonalNome(personalFinal);
+            setObjetivo(jsonPersonalizado.objetivo || "");
+            setObservacoesGerais(jsonPersonalizado.observacoes || "");
+            setCodigoTreinoAtual(codigoFinal);
+            setDiaSemanaAtual(diaFinal);
+            setExercicios(exerciciosCarregados);
+
+            await dispararPrint({
+              exercicios: exerciciosCarregados,
+              personalNome: personalFinal,
+              codigoTreinoAtual: codigoFinal,
+              diaSemanaAtual: diaFinal,
+            });
+
+            return;
+          }
+        }
+
+        // 3) só tenta qualquer personalizado se NÃO veio treino_id
+        if (alunoId && !treinoId) {
+          const resPersonalizado = await apiFetch(
+            `/api/treinos-personalizados/ativo?aluno_id=${alunoId}`,
+            { cache: "no-store" }
+          );
+
+          const jsonPersonalizado = await resPersonalizado.json().catch(() => null);
+
+          if (
+            resPersonalizado.ok &&
+            jsonPersonalizado &&
+            Array.isArray(jsonPersonalizado.itens) &&
+            jsonPersonalizado.itens.length > 0
+          ) {
+            const personalFinal = personalParam || jsonPersonalizado.personal_nome || "";
+            const codigoFinal = jsonPersonalizado.codigo_treino || "";
+            const diaFinal = jsonPersonalizado.dia_semana || "";
+            const exerciciosCarregados = (jsonPersonalizado.itens || []).map((item: any) => ({
+              nome: item.nome,
+              series: item.series || "",
+              repeticoes: item.repeticoes || "",
+              carga: item.carga || "",
+              descanso: item.descanso || "",
+              obs: item.obs || "",
+            }));
+
+            setTituloTreino(jsonPersonalizado.titulo || "TREINO PERSONALIZADO");
+            setPersonalNome(personalFinal);
+            setObjetivo(jsonPersonalizado.objetivo || "");
+            setObservacoesGerais(jsonPersonalizado.observacoes || "");
+            setCodigoTreinoAtual(codigoFinal);
+            setDiaSemanaAtual(diaFinal);
+            setExercicios(exerciciosCarregados);
+
+            await dispararPrint({
+              exercicios: exerciciosCarregados,
+              personalNome: personalFinal,
+              codigoTreinoAtual: codigoFinal,
+              diaSemanaAtual: diaFinal,
+            });
+
+            return;
+          }
+        }
+
+        // 4) fallback final treino padrão antigo
+        const qsSemana = new URLSearchParams({
+          semana: semanaAtual,
+          dia,
+          nivel,
+          tipo,
+        });
+
+        const resTreinoSemana = await apiFetch(`/api/treinos?${qsSemana.toString()}`, {
+          cache: "no-store",
+        });
+
+        let jsonTreino = await resTreinoSemana.json().catch(() => []);
+
+        if (!Array.isArray(jsonTreino) || jsonTreino.length === 0) {
+          const qsFallback = new URLSearchParams({
+            dia,
+            nivel,
+            tipo,
+          });
+
+          const resTreinoFallback = await apiFetch(
+            `/api/treinos?${qsFallback.toString()}`,
+            {
+              cache: "no-store",
+            }
+          );
+
+          jsonTreino = await resTreinoFallback.json().catch(() => []);
+        }
+
+        const primeiro = Array.isArray(jsonTreino) ? jsonTreino[0] : null;
+
+        if (!primeiro) {
+          setErro("Nenhum treino encontrado para essa combinação");
+          return;
+        }
+
+        const exerciciosCarregados = Array.isArray(primeiro.exercicios)
+          ? primeiro.exercicios
+          : [];
+
+        setTituloTreino(`TREINO ${dia || ""}`.trim() || "TREINO PERSONALIZADO");
+        setPersonalNome(personalParam || "");
+        setObjetivo("");
+        setObservacoesGerais("");
+        setCodigoTreinoAtual("");
+        setDiaSemanaAtual(dia || "");
+        setExercicios(exerciciosCarregados);
+
+        await dispararPrint({
+          exercicios: exerciciosCarregados,
+          personalNome: personalParam || "",
+          codigoTreinoAtual: "",
+          diaSemanaAtual: dia || "",
+        });
+      } catch {
+        setErro("Erro ao preparar impressão rápida");
       } finally {
         setLoading(false);
       }
     };
 
     carregar();
-  }, [alunoId, treinoId, origem, autoPrint, personalNomeParam]);
+  }, [
+    semanaAtual,
+    dia,
+    tipo,
+    nivel,
+    alunoId,
+    treinoId,
+    codigoTreino,
+    diaSemana,
+    personalParam,
+    autoPrint,
+  ]);
 
   if (loading) {
     return <p className="p-6">Preparando impressão...</p>;
@@ -184,7 +367,6 @@ export default function ImpressaoRapidaPage() {
   return (
     <main className="bg-white min-h-screen p-6">
       <div className="print-area bg-white p-3 mx-auto font-mono text-xs border border-gray-300 max-w-sm">
-
         <div className="text-center mb-2">
           {logoAcademia ? (
             <img
@@ -201,22 +383,71 @@ export default function ImpressaoRapidaPage() {
           )}
 
           <p className="text-sm font-bold mt-2">{nomeAcademia}</p>
-          <p className="text-lg font-bold tracking-widest">
-            TREINO PERSONALIZADO
-          </p>
+          <p className="text-lg font-bold tracking-widest">{tituloTreino}</p>
           <p className="text-[10px] text-gray-500">Sistema TreinoPrint</p>
         </div>
 
         <div className="border-t border-dashed my-3" />
 
         <div className="text-xs space-y-1">
-          <p><strong>Aluno:</strong> {nomeAluno}</p>
-          <p><strong>Personal:</strong> {nomePersonal}</p>
-          <p><strong>Data:</strong> {new Date().toLocaleString("pt-BR")}</p>
-          <p><strong>Treino:</strong> {diaTreino}</p>
-          <p><strong>Nível:</strong> {nivelTreino}</p>
-          <p><strong>Tipo:</strong> {tipoTreino}</p>
+          <p>
+            <strong>Aluno:</strong> {aluno || "_____________"}
+          </p>
+
+          {personalNome ? (
+            <p>
+              <strong>Personal:</strong> {personalNome}
+            </p>
+          ) : null}
+
+          <p>
+            <strong>Data:</strong> {new Date().toLocaleString("pt-BR")}
+          </p>
+
+          {codigoTreinoAtual ? (
+            <p>
+              <strong>Código:</strong> {codigoTreinoAtual}
+            </p>
+          ) : null}
+
+          {diaSemanaAtual ? (
+            <p>
+              <strong>Dia:</strong> {diaSemanaAtual}
+            </p>
+          ) : dia ? (
+            <p>
+              <strong>Treino:</strong> {dia}
+            </p>
+          ) : null}
+
+          {nivel ? (
+            <p>
+              <strong>Nível:</strong> {nivel}
+            </p>
+          ) : null}
+
+          {tipo ? (
+            <p>
+              <strong>Tipo:</strong> {tipo}
+            </p>
+          ) : null}
+
+          {objetivo ? (
+            <p>
+              <strong>Objetivo:</strong> {objetivo}
+            </p>
+          ) : null}
         </div>
+
+        {observacoesGerais ? (
+          <>
+            <div className="border-t border-dashed my-3" />
+            <div className="text-xs">
+              <p className="font-bold">Observações gerais</p>
+              <p>{observacoesGerais}</p>
+            </div>
+          </>
+        ) : null}
 
         <div className="border-t border-dashed my-3" />
 
@@ -225,16 +456,12 @@ export default function ImpressaoRapidaPage() {
             <p className="font-bold text-sm">
               {i + 1}. {ex.nome}
             </p>
-
             <p>
               Séries: {ex.series || "-"} | Reps: {ex.repeticoes || "-"} | Carga:{" "}
               {ex.carga || "-"}
             </p>
-
-            {ex.obs ? (
-              <p className="italic text-[11px]">Obs: {ex.obs}</p>
-            ) : null}
-
+            {ex.descanso ? <p>Descanso: {ex.descanso}</p> : null}
+            {ex.obs ? <p className="italic text-[11px]">Obs: {ex.obs}</p> : null}
             <div className="border-t border-dashed mt-2" />
           </div>
         ))}
@@ -243,7 +470,6 @@ export default function ImpressaoRapidaPage() {
           <p>Horário: {new Date().toLocaleTimeString("pt-BR")}</p>
           <p className="font-semibold tracking-wider">Bom treino 💪</p>
         </div>
-
       </div>
     </main>
   );

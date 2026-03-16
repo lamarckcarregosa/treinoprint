@@ -4,20 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/apiFetch";
 import SystemLoader from "@/components/SystemLoader";
 import SystemError from "@/components/SystemError";
-import {
-  Users,
-  UserCheck,
-  Dumbbell,
-  CalendarDays,
-  AlertTriangle,
-  Wallet,
-  TrendingUp,
-  CreditCard,
-  ArrowRight,
-  Printer,
-  Landmark,
-  Activity,
-} from "lucide-react";
+import { Activity } from "lucide-react";
 
 type Aluno = {
   id: number | string;
@@ -34,10 +21,30 @@ type Exercicio = {
   series?: string;
   repeticoes?: string;
   carga?: string;
+  descanso?: string;
   obs?: string;
 };
 
-const diasSemana = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
+type TreinoPersonalizadoResumo = {
+  id: number;
+  titulo?: string | null;
+  codigo_treino?: string | null;
+  dia_semana?: string | null;
+  objetivo?: string | null;
+  observacoes?: string | null;
+  ativo: boolean;
+};
+
+const diasSemana = [
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+  "Domingo",
+];
+
 const niveis = ["Iniciante", "Intermediário", "Avançado"];
 const tipos = ["Masculino", "Feminino"];
 
@@ -64,14 +71,37 @@ export default function ImprimirPage() {
   const [nomeAcademia, setNomeAcademia] = useState("");
 
   const [exercicios, setExercicios] = useState<Exercicio[]>([]);
+  const [tituloTreino, setTituloTreino] = useState("TREINO PERSONALIZADO");
+  const [objetivoTreino, setObjetivoTreino] = useState("");
+  const [observacoesTreino, setObservacoesTreino] = useState("");
+  const [codigoTreinoAtual, setCodigoTreinoAtual] = useState("");
+  const [diaTreinoAtual, setDiaTreinoAtual] = useState("");
+
+  const [treinosPersonalizados, setTreinosPersonalizados] = useState<
+    TreinoPersonalizadoResumo[]
+  >([]);
+  const [treinoPersonalizadoSelecionado, setTreinoPersonalizadoSelecionado] =
+    useState("");
+  const [carregandoTreinosPersonalizados, setCarregandoTreinosPersonalizados] =
+    useState(false);
 
   const [loadingPagina, setLoadingPagina] = useState(true);
   const [erroPagina, setErroPagina] = useState("");
 
   const dataAtual = useMemo(
-    () => new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }),
+    () =>
+      new Date().toLocaleString("pt-BR", {
+        dateStyle: "short",
+        timeStyle: "short",
+      }),
     []
   );
+
+  const alunoSelecionadoObj = useMemo(() => {
+    return (
+      alunos.find((a) => String(a.nome) === String(alunoSelecionado)) || null
+    );
+  }, [alunos, alunoSelecionado]);
 
   const carregarAcademia = async () => {
     try {
@@ -134,6 +164,127 @@ export default function ImprimirPage() {
     }
   };
 
+  const limparContextoTreino = () => {
+    setTreinoBanco(null);
+    setMsgTreino("");
+    setExercicios([]);
+    setTituloTreino("TREINO PERSONALIZADO");
+    setObjetivoTreino("");
+    setObservacoesTreino("");
+    setCodigoTreinoAtual("");
+    setDiaTreinoAtual("");
+  };
+
+  const carregarTreinosPersonalizadosDoAluno = async (
+    alunoId: number | string
+  ) => {
+    try {
+      setCarregandoTreinosPersonalizados(true);
+
+      const res = await apiFetch(
+        `/api/treinos-personalizados?aluno_id=${alunoId}&ativo=true`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      const json = await res.json().catch(() => []);
+
+      if (!res.ok) {
+        console.error("Erro ao carregar treinos personalizados:", json);
+        setTreinosPersonalizados([]);
+        return;
+      }
+
+      const lista = Array.isArray(json) ? json : [];
+      setTreinosPersonalizados(lista);
+    } catch (error) {
+      console.error("Erro ao carregar treinos personalizados:", error);
+      setTreinosPersonalizados([]);
+    } finally {
+      setCarregandoTreinosPersonalizados(false);
+    }
+  };
+
+  const carregarTreinoPersonalizado = async () => {
+    if (!alunoSelecionadoObj?.id) {
+      alert("Selecione um aluno válido.");
+      return;
+    }
+
+    setCarregandoTreino(true);
+    setMsgTreino("");
+    setTreinoBanco(null);
+
+    try {
+      const params = new URLSearchParams({
+        aluno_id: String(alunoSelecionadoObj.id),
+      });
+
+      const treinoEscolhido = treinosPersonalizados.find(
+        (t) => String(t.id) === String(treinoPersonalizadoSelecionado)
+      );
+
+      if (treinoEscolhido?.codigo_treino) {
+        params.set("codigo_treino", treinoEscolhido.codigo_treino);
+      }
+
+      if (treinoEscolhido?.dia_semana) {
+        params.set("dia_semana", treinoEscolhido.dia_semana);
+      }
+
+      const res = await apiFetch(
+        `/api/treinos-personalizados/ativo?${params.toString()}`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setMsgTreino((json as any)?.error || "Erro ao buscar treino personalizado.");
+        setExercicios([]);
+        return;
+      }
+
+      if (!json || !Array.isArray((json as any).itens) || (json as any).itens.length === 0) {
+        setMsgTreino("Nenhum treino personalizado encontrado.");
+        setExercicios([]);
+        return;
+      }
+
+      setTreinoBanco(json);
+
+      const itens = Array.isArray((json as any).itens) ? (json as any).itens : [];
+
+      setTituloTreino((json as any).titulo || "TREINO PERSONALIZADO");
+      setObjetivoTreino((json as any).objetivo || "");
+      setObservacoesTreino((json as any).observacoes || "");
+      setCodigoTreinoAtual((json as any).codigo_treino || "");
+      setDiaTreinoAtual((json as any).dia_semana || "");
+
+      setExercicios(
+        itens.map((item: any) => ({
+          nome: item.nome || item.nome_exercicio_snapshot || "",
+          series: item.series || "",
+          repeticoes: item.repeticoes || "",
+          carga: item.carga || "",
+          descanso: item.descanso || "",
+          obs: item.obs || item.observacoes || "",
+        }))
+      );
+
+      setMsgTreino("Treino personalizado carregado com sucesso.");
+    } catch (error) {
+      console.error("Erro ao buscar treino personalizado:", error);
+      setMsgTreino("Erro ao buscar treino personalizado.");
+      setExercicios([]);
+    } finally {
+      setCarregandoTreino(false);
+    }
+  };
+
   useEffect(() => {
     const iniciar = async () => {
       try {
@@ -153,6 +304,15 @@ export default function ImprimirPage() {
     iniciar();
   }, []);
 
+  useEffect(() => {
+    if (alunoSelecionadoObj?.id) {
+      setTreinoPersonalizadoSelecionado("");
+      setTreinosPersonalizados([]);
+      limparContextoTreino();
+      carregarTreinosPersonalizadosDoAluno(alunoSelecionadoObj.id);
+    }
+  }, [alunoSelecionadoObj?.id]);
+
   const carregarModelo = async () => {
     setCarregandoTreino(true);
     setMsgTreino("");
@@ -166,7 +326,9 @@ export default function ImprimirPage() {
         tipo,
       });
 
-      const res = await apiFetch(`/api/treinos?${qs.toString()}`, { cache: "no-store" });
+      const res = await apiFetch(`/api/treinos?${qs.toString()}`, {
+        cache: "no-store",
+      });
       const data = await res.json().catch(() => []);
 
       if (!res.ok) {
@@ -184,7 +346,13 @@ export default function ImprimirPage() {
         return;
       }
 
-      setMsgTreino("Treino carregado com sucesso.");
+      setTituloTreino(`TREINO ${diaSelecionado || ""}`.trim() || "TREINO PERSONALIZADO");
+      setObjetivoTreino("");
+      setObservacoesTreino("");
+      setCodigoTreinoAtual("");
+      setDiaTreinoAtual(diaSelecionado || "");
+
+      setMsgTreino("Treino padrão carregado com sucesso.");
       setExercicios(Array.isArray(primeiro.exercicios) ? primeiro.exercicios : []);
     } catch (error) {
       console.error("Erro ao buscar treino:", error);
@@ -208,14 +376,20 @@ export default function ImprimirPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          aluno_id: alunoSelecionadoObj?.id || null,
           aluno_nome: alunoSelecionado,
           personal_nome: personalSelecionado,
           semana,
-          dia: diaSelecionado,
+          dia: diaTreinoAtual || diaSelecionado,
           nivel,
           tipo,
           exercicios,
           user_id: userId,
+          origem:
+            codigoTreinoAtual || treinoPersonalizadoSelecionado
+              ? "treino_personalizado"
+              : "treino_padrao",
+          codigo_treino: codigoTreinoAtual || null,
         }),
       });
     } catch (error) {
@@ -250,10 +424,21 @@ export default function ImprimirPage() {
       setDiaSelecionado((json as any).dia || diasSemana[0]);
       setNivel((json as any).nivel || niveis[0]);
       setTipo((json as any).tipo || tipos[0]);
-      setExercicios(Array.isArray((json as any).exercicios) ? (json as any).exercicios : []);
+      setExercicios(
+        Array.isArray((json as any).exercicios) ? (json as any).exercicios : []
+      );
       setTreinoBanco({
         id: (json as any).id,
       });
+      setTituloTreino(
+        (json as any).codigo_treino
+          ? `TREINO ${(json as any).codigo_treino}`
+          : `TREINO ${(json as any).dia || ""}`.trim() || "TREINO PERSONALIZADO"
+      );
+      setCodigoTreinoAtual((json as any).codigo_treino || "");
+      setDiaTreinoAtual((json as any).dia || "");
+      setObjetivoTreino("");
+      setObservacoesTreino("");
       setMsgTreino("Último treino carregado para reimpressão.");
     } catch (error) {
       console.error(error);
@@ -294,14 +479,14 @@ export default function ImprimirPage() {
               Bem-vindo ao Imprimir
             </h1>
             <p className="text-zinc-300 mt-3 max-w-2xl">
-              Selecione aluno, personal e carregue o treino do banco.
+              Selecione aluno, personal e carregue o treino padrão ou personalizado.
             </p>
           </div>
 
           <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
             <p className="text-white/60 text-xs">Status do sistema</p>
             <p className="text-xl font-black mt-1">TreinoPrint Online</p>
-             <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
+            <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
               <Activity size={16} />
               Operação ativa
             </div>
@@ -323,7 +508,7 @@ export default function ImprimirPage() {
                 placeholder="2026-03-02"
               />
               <p className="text-[11px] text-gray-500 mt-1">
-                Defina a semana do treino a ser buscado
+                Defina a semana do treino padrão a ser buscado
               </p>
             </div>
 
@@ -376,6 +561,35 @@ export default function ImprimirPage() {
               </select>
             </div>
 
+            <div className="md:col-span-2 border-t pt-3">
+              <label className="text-sm font-semibold text-gray-600">
+                Treino personalizado do aluno
+              </label>
+
+              <select
+                value={treinoPersonalizadoSelecionado}
+                onChange={(e) => {
+                  limparContextoTreino();
+                  setTreinoPersonalizadoSelecionado(e.target.value);
+                }}
+                className="w-full border rounded-xl p-3 mt-1"
+              >
+                <option value="">-- Nenhum selecionado --</option>
+                {treinosPersonalizados.map((treino) => (
+                  <option key={treino.id} value={treino.id}>
+                    {(treino.titulo || "Treino sem título") +
+                      ` • Código: ${treino.codigo_treino || "-"} • Dia: ${treino.dia_semana || "-"}`}
+                  </option>
+                ))}
+              </select>
+
+              <p className="text-[11px] text-gray-500 mt-1">
+                {carregandoTreinosPersonalizados
+                  ? "Carregando treinos personalizados..."
+                  : "Selecione um treino personalizado ativo do aluno, se houver."}
+              </p>
+            </div>
+
             <div>
               <label className="text-sm font-semibold text-gray-600">Dia</label>
               <select
@@ -384,6 +598,9 @@ export default function ImprimirPage() {
                   setTreinoBanco(null);
                   setMsgTreino("");
                   setExercicios([]);
+                  setCodigoTreinoAtual("");
+                  setDiaTreinoAtual("");
+                  setTituloTreino("TREINO PERSONALIZADO");
                   setDiaSelecionado(e.target.value);
                 }}
                 className="w-full border rounded-xl p-3 mt-1"
@@ -404,6 +621,9 @@ export default function ImprimirPage() {
                   setTreinoBanco(null);
                   setMsgTreino("");
                   setExercicios([]);
+                  setCodigoTreinoAtual("");
+                  setDiaTreinoAtual("");
+                  setTituloTreino("TREINO PERSONALIZADO");
                   setNivel(e.target.value);
                 }}
                 className="w-full border rounded-xl p-3 mt-1"
@@ -424,6 +644,9 @@ export default function ImprimirPage() {
                   setTreinoBanco(null);
                   setMsgTreino("");
                   setExercicios([]);
+                  setCodigoTreinoAtual("");
+                  setDiaTreinoAtual("");
+                  setTituloTreino("TREINO PERSONALIZADO");
                   setTipo(e.target.value);
                 }}
                 className="w-full border rounded-xl p-3 mt-1"
@@ -443,7 +666,20 @@ export default function ImprimirPage() {
                 disabled={carregandoTreino}
                 className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-4 py-2 rounded-xl"
               >
-                {carregandoTreino ? "Carregando..." : "Carregar treino do banco"}
+                {carregandoTreino ? "Carregando..." : "Carregar treino padrão"}
+              </button>
+
+              <button
+                type="button"
+                onClick={carregarTreinoPersonalizado}
+                disabled={
+                  carregandoTreino ||
+                  !treinoPersonalizadoSelecionado ||
+                  !alunoSelecionadoObj?.id
+                }
+                className="bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white px-4 py-2 rounded-xl"
+              >
+                {carregandoTreino ? "Carregando..." : "Carregar treino personalizado"}
               </button>
 
               <button
@@ -459,7 +695,7 @@ export default function ImprimirPage() {
                 {treinoBanco ? (
                   <span className="text-green-700">Treino encontrado.</span>
                 ) : (
-                  <span className="text-gray-500">Selecione os filtros e busque.</span>
+                  <span className="text-gray-500">Selecione os filtros e carregue um treino.</span>
                 )}
               </span>
             </div>
@@ -489,7 +725,12 @@ export default function ImprimirPage() {
                       Séries: {ex.series || "-"} | Reps: {ex.repeticoes || "-"} | Carga:{" "}
                       {ex.carga || "-"}
                     </p>
-                    {ex.obs ? <p className="text-xs italic text-gray-500">Obs: {ex.obs}</p> : null}
+                    {ex.descanso ? (
+                      <p className="text-xs text-gray-600">Descanso: {ex.descanso}</p>
+                    ) : null}
+                    {ex.obs ? (
+                      <p className="text-xs italic text-gray-500">Obs: {ex.obs}</p>
+                    ) : null}
                   </div>
                 ))
               )}
@@ -523,7 +764,9 @@ export default function ImprimirPage() {
               )}
 
               <p className="text-sm font-bold mt-2">{nomeAcademia}</p>
-              <p className="text-lg font-bold tracking-widest">TREINO PERSONALIZADO</p>
+              <p className="text-lg font-bold tracking-widest">
+                {tituloTreino || "TREINO PERSONALIZADO"}
+              </p>
               <p className="text-[10px] text-gray-500">Sistema TreinoPrint</p>
             </div>
 
@@ -539,16 +782,44 @@ export default function ImprimirPage() {
               <p>
                 <strong>Data:</strong> {dataAtual}
               </p>
+
+              {codigoTreinoAtual ? (
+                <p>
+                  <strong>Código:</strong> {codigoTreinoAtual}
+                </p>
+              ) : null}
+
               <p>
-                <strong>Treino:</strong> {diaSelecionado}
+                <strong>Treino:</strong> {diaTreinoAtual || diaSelecionado}
               </p>
-              <p>
-                <strong>Nível:</strong> {nivel}
-              </p>
-              <p>
-                <strong>Tipo:</strong> {tipo}
-              </p>
+
+              {!codigoTreinoAtual ? (
+                <>
+                  <p>
+                    <strong>Nível:</strong> {nivel}
+                  </p>
+                  <p>
+                    <strong>Tipo:</strong> {tipo}
+                  </p>
+                </>
+              ) : null}
+
+              {objetivoTreino ? (
+                <p>
+                  <strong>Objetivo:</strong> {objetivoTreino}
+                </p>
+              ) : null}
             </div>
+
+            {observacoesTreino ? (
+              <>
+                <div className="border-t border-dashed my-3" />
+                <div className="text-xs space-y-1">
+                  <p className="font-bold">Observações gerais</p>
+                  <p>{observacoesTreino}</p>
+                </div>
+              </>
+            ) : null}
 
             <div className="border-t border-dashed my-3" />
 
@@ -561,6 +832,7 @@ export default function ImprimirPage() {
                   Séries: {ex.series || "-"} | Reps: {ex.repeticoes || "-"} | Carga:{" "}
                   {ex.carga || "-"}
                 </p>
+                {ex.descanso ? <p>Descanso: {ex.descanso}</p> : null}
                 {ex.obs ? <p className="italic text-[11px]">Obs: {ex.obs}</p> : null}
                 <div className="border-t border-dashed mt-2" />
               </div>

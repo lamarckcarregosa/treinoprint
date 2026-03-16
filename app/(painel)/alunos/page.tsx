@@ -491,6 +491,7 @@ export default function AlunosPage() {
                   <option value="anual">Anual</option>
                 </select>
               </div>
+              
 
               <div>
                 <label className="block text-sm font-semibold text-gray-600 mb-1">

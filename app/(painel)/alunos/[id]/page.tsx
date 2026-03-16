@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
+
 import {
   ChartColumnBig,
   IdCard,
@@ -16,6 +17,7 @@ import {
   ChevronDown,
   History,
   PlusCircle,
+  PencilRuler,
 } from "lucide-react";
 
 type Aluno = {
@@ -389,8 +391,16 @@ export default function AlunoPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <div className="relative" ref={menuAvalRef}>
-            <button
+          
+          <button
+  onClick={() => router.push(`/alunos/${aluno.id}/treino-personalizado`)}
+  className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl px-4 py-2 flex items-center gap-2"
+>
+  <PencilRuler size={16} />
+  Treino personalizado
+</button>
+<div className="relative" ref={menuAvalRef}>
+ <button
               type="button"
               onClick={() => setMenuAval((v) => !v)}
               className="flex items-center gap-2 bg-black text-white rounded-xl px-4 py-3"
@@ -399,6 +409,7 @@ export default function AlunoPage() {
               Avaliação física
               <ChevronDown size={15} />
             </button>
+            
 
             {menuAval && (
               <div className="absolute left-0 top-full mt-2 w-64 bg-white border border-black/10 rounded-2xl shadow-xl overflow-hidden z-50">

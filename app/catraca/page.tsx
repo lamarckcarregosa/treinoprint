@@ -32,6 +32,15 @@ type TreinoOpcao = {
   tipo?: string;
 };
 
+type TreinoPersonalizadoOpcao = {
+  id: number;
+  titulo?: string | null;
+  codigo_treino?: string | null;
+  dia_semana?: string | null;
+  objetivo?: string | null;
+  ativo: boolean;
+};
+
 function formatarDataHora(data: string) {
   try {
     return new Date(data).toLocaleString("pt-BR");
@@ -59,6 +68,10 @@ function CatracaPageContent() {
   const [mostrarEscolhaTreino, setMostrarEscolhaTreino] = useState(false);
   const [carregandoTreinos, setCarregandoTreinos] = useState(false);
   const [treinos, setTreinos] = useState<TreinoOpcao[]>([]);
+
+  const [treinosPersonalizados, setTreinosPersonalizados] = useState<TreinoPersonalizadoOpcao[]>([]);
+  const [carregandoTreinosPersonalizados, setCarregandoTreinosPersonalizados] = useState(false);
+  const [modoEscolhaTreino, setModoEscolhaTreino] = useState<"personalizado" | "padrao" | "">("");
 
   const [diaSelecionado, setDiaSelecionado] = useState("");
   const [nivelSelecionado, setNivelSelecionado] = useState("");
@@ -211,6 +224,8 @@ function CatracaPageContent() {
       setMostrarPerguntaImpressao(false);
       setMostrarEscolhaTreino(false);
       setTreinos([]);
+      setTreinosPersonalizados([]);
+      setModoEscolhaTreino("");
       setDiaSelecionado("");
       setNivelSelecionado("");
       setTipoSelecionado("");
@@ -255,9 +270,36 @@ function CatracaPageContent() {
       setDiaSelecionado("");
       setNivelSelecionado("");
       setTipoSelecionado("");
+      setModoEscolhaTreino("padrao");
       setMostrarEscolhaTreino(true);
     } finally {
       setCarregandoTreinos(false);
+    }
+  };
+
+  const carregarTreinosPersonalizadosAluno = async (alunoId: number) => {
+    try {
+      setCarregandoTreinosPersonalizados(true);
+
+      const res = await apiFetch(
+        `/api/treinos-personalizados?aluno_id=${alunoId}&ativo=true`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      const json = await res.json().catch(() => []);
+
+      if (!res.ok) {
+        alert((json as any).error || "Erro ao carregar treinos personalizados");
+        return [];
+      }
+
+      const lista = Array.isArray(json) ? json : [];
+      setTreinosPersonalizados(lista);
+      return lista;
+    } finally {
+      setCarregandoTreinosPersonalizados(false);
     }
   };
 
@@ -292,6 +334,8 @@ function CatracaPageContent() {
         setResultado(retornoErro);
         setMostrarPerguntaImpressao(false);
         setMostrarEscolhaTreino(false);
+        setTreinosPersonalizados([]);
+        setModoEscolhaTreino("");
         tocarSom(false);
         setCodigo("");
         limparTelaDepois();
@@ -309,9 +353,13 @@ function CatracaPageContent() {
         cancelarAutoReset();
         setMostrarPerguntaImpressao(true);
         setMostrarEscolhaTreino(false);
+        setTreinosPersonalizados([]);
+        setModoEscolhaTreino("");
       } else {
         setMostrarPerguntaImpressao(false);
         setMostrarEscolhaTreino(false);
+        setTreinosPersonalizados([]);
+        setModoEscolhaTreino("");
         limparTelaDepois();
       }
 
@@ -402,10 +450,10 @@ function CatracaPageContent() {
   }, [treinos, diaSelecionado, nivelSelecionado]);
 
   useEffect(() => {
-    if (mostrarEscolhaTreino && diasDisponiveis.length === 1 && !diaSelecionado) {
+    if (modoEscolhaTreino === "padrao" && mostrarEscolhaTreino && diasDisponiveis.length === 1 && !diaSelecionado) {
       setDiaSelecionado(diasDisponiveis[0]);
     }
-  }, [mostrarEscolhaTreino, diasDisponiveis, diaSelecionado]);
+  }, [modoEscolhaTreino, mostrarEscolhaTreino, diasDisponiveis, diaSelecionado]);
 
   useEffect(() => {
     if (niveisDisponiveis.length === 1 && diaSelecionado && !nivelSelecionado) {
@@ -437,6 +485,42 @@ function CatracaPageContent() {
     );
   }, [treinos, diaSelecionado, nivelSelecionado, tipoSelecionado]);
 
+  const abrirImpressaoTreinoPersonalizado = (treino: TreinoPersonalizadoOpcao) => {
+    if (!resultado?.aluno_id) return;
+
+    if (!personalSelecionado) {
+      alert("Selecione o personal antes de imprimir.");
+      return;
+    }
+
+    const params = new URLSearchParams({
+      aluno_id: String(resultado.aluno_id),
+      aluno: resultado.aluno || "",
+      origem: "catraca",
+      auto_print: "1",
+      personal_nome: personalSelecionado,
+    });
+
+    if (treino.codigo_treino) {
+      params.set("codigo_treino", treino.codigo_treino);
+    }
+
+    if (treino.dia_semana) {
+      params.set("dia_semana", treino.dia_semana);
+    }
+
+    window.open(`/imprimir/rapido?${params.toString()}`, "_blank");
+
+    setMostrarPerguntaImpressao(false);
+    setMostrarEscolhaTreino(false);
+    setTreinosPersonalizados([]);
+    setModoEscolhaTreino("");
+    setDiaSelecionado("");
+    setNivelSelecionado("");
+    setTipoSelecionado("");
+    limparTelaDepois();
+  };
+
   const abrirImpressaoCupom = () => {
     if (!resultado?.aluno_id || !treinoSelecionado?.id) return;
 
@@ -445,15 +529,21 @@ function CatracaPageContent() {
       return;
     }
 
-    window.open(
-      `/imprimir/rapido?aluno_id=${resultado.aluno_id}&treino_id=${treinoSelecionado.id}&origem=catraca&auto_print=1&personal_nome=${encodeURIComponent(
-        personalSelecionado
-      )}`,
-      "_blank"
-    );
+    const params = new URLSearchParams({
+      aluno_id: String(resultado.aluno_id),
+      aluno: resultado.aluno || "",
+      treino_id: String(treinoSelecionado.id),
+      origem: "catraca",
+      auto_print: "1",
+      personal_nome: personalSelecionado,
+    });
+
+    window.open(`/imprimir/rapido?${params.toString()}`, "_blank");
 
     setMostrarPerguntaImpressao(false);
     setMostrarEscolhaTreino(false);
+    setTreinosPersonalizados([]);
+    setModoEscolhaTreino("");
     setDiaSelecionado("");
     setNivelSelecionado("");
     setTipoSelecionado("");
@@ -651,7 +741,21 @@ function CatracaPageContent() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={async () => {
+                  if (!resultado?.aluno_id) return;
+
                   setMostrarPerguntaImpressao(false);
+
+                  const listaPersonalizados = await carregarTreinosPersonalizadosAluno(
+                    resultado.aluno_id
+                  );
+
+                  if (listaPersonalizados.length > 0) {
+                    setModoEscolhaTreino("personalizado");
+                    setMostrarEscolhaTreino(true);
+                    return;
+                  }
+
+                  setModoEscolhaTreino("padrao");
                   await carregarTreinos();
                 }}
                 className="bg-black text-white rounded-xl py-3 font-semibold"
@@ -681,12 +785,16 @@ function CatracaPageContent() {
           >
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-2xl font-black text-gray-900">
-                Escolher treino para imprimir
+                {modoEscolhaTreino === "personalizado"
+                  ? "Escolher treino personalizado"
+                  : "Escolher treino para imprimir"}
               </h2>
 
               <button
                 onClick={() => {
                   setMostrarEscolhaTreino(false);
+                  setTreinosPersonalizados([]);
+                  setModoEscolhaTreino("");
                   limparTelaDepois();
                 }}
                 className="border rounded-xl px-4 py-2"
@@ -695,27 +803,74 @@ function CatracaPageContent() {
               </button>
             </div>
 
-            {carregandoTreinos ? (
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold mb-1">Personal</label>
+              <select
+                value={personalSelecionado}
+                onChange={(e) => setPersonalSelecionado(e.target.value)}
+                className="w-full border rounded-xl p-3"
+              >
+                <option value="">Selecione o personal</option>
+                {personais.map((nome) => (
+                  <option key={nome} value={nome}>
+                    {nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {modoEscolhaTreino === "personalizado" ? (
+              <div className="space-y-4">
+                {carregandoTreinosPersonalizados ? (
+                  <p className="text-gray-500">Carregando treinos personalizados...</p>
+                ) : treinosPersonalizados.length === 0 ? (
+                  <p className="text-gray-500">
+                    Nenhum treino personalizado ativo encontrado.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {treinosPersonalizados.map((treino) => (
+                      <button
+                        key={treino.id}
+                        onClick={() => abrirImpressaoTreinoPersonalizado(treino)}
+                        disabled={!personalSelecionado}
+                        className="w-full text-left rounded-2xl border p-4 hover:bg-gray-50 transition disabled:opacity-50"
+                      >
+                        <p className="font-semibold text-gray-900">
+                          {treino.titulo || "Treino sem título"}
+                        </p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Código: {treino.codigo_treino || "-"} • Dia: {treino.dia_semana || "-"}
+                        </p>
+                        {treino.objetivo ? (
+                          <p className="text-sm text-gray-500 mt-1">
+                            Objetivo: {treino.objetivo}
+                          </p>
+                        ) : null}
+                        <p className="text-sm text-gray-500 mt-1">
+                          Personal: {personalSelecionado || "-"}
+                        </p>
+                      </button>
+                    ))}
+
+                    <button
+                      onClick={async () => {
+                        setTreinosPersonalizados([]);
+                        setModoEscolhaTreino("padrao");
+                        await carregarTreinos();
+                      }}
+                      className="w-full border rounded-xl py-3 font-semibold"
+                    >
+                      Usar treino padrão
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : carregandoTreinos ? (
               <p className="text-gray-500">Carregando treinos...</p>
             ) : (
               <div className="space-y-4">
                 <div className="grid md:grid-cols-2 gap-3">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold mb-1">Personal</label>
-                    <select
-                      value={personalSelecionado}
-                      onChange={(e) => setPersonalSelecionado(e.target.value)}
-                      className="w-full border rounded-xl p-3"
-                    >
-                      <option value="">Selecione o personal</option>
-                      {personais.map((nome) => (
-                        <option key={nome} value={nome}>
-                          {nome}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
                   <div>
                     <label className="block text-sm font-semibold mb-1">Dia</label>
                     <select

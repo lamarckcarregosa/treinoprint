@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Activity } from "lucide-react";
 import SystemLoader from "@/components/SystemLoader";
 import SystemError from "@/components/SystemError";
+import Link from "next/link";
 
 type Exercicio = {
   nome: string;
@@ -286,7 +287,12 @@ export default function TreinosPage() {
               Monte treinos por semana, dia, nível e tipo.
             </p>
           </div>
-
+<Link
+  href={`/treinos-personalizados`}
+  className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl px-4 py-2 inline-flex items-center"
+>
+  Treino personalizado
+</Link>
           {editandoId ? (
             <button
               onClick={limparFormulario}

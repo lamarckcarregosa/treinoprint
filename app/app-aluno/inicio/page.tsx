@@ -31,15 +31,21 @@ type Exercicio = {
   repeticoes?: string;
   carga?: string;
   obs?: string;
+  descanso?: string;
 };
 
 type Treino = {
   id: number;
   dia?: string;
-  nivel?: string;
+  nivel?: string | null;
+  tipo?: string | null;
   personal_nome?: string;
   exercicios?: Exercicio[];
   created_at: string;
+  titulo?: string;
+  objetivo?: string;
+  observacoes?: string;
+  origem?: string;
 };
 
 type Avaliacao = {
@@ -117,7 +123,7 @@ export default function InicioAlunoPage() {
   const router = useRouter();
 
   const [aluno, setAluno] = useState<Aluno | null>(null);
-  const [treinos, setTreinos] = useState<Treino[]>([]);
+  const [treinoAtual, setTreinoAtual] = useState<Treino | null>(null);
   const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([]);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [feitos, setFeitos] = useState<ExercicioFeito[]>([]);
@@ -159,7 +165,7 @@ export default function InicioAlunoPage() {
           ]);
 
         const jsonAluno = await resAluno.json().catch(() => ({}));
-        const jsonTreinos = await resTreinos.json().catch(() => []);
+        const jsonTreinos = await resTreinos.json().catch(() => null);
         const jsonAvaliacoes = await resAvaliacoes.json().catch(() => []);
         const jsonFinanceiro = await resFinanceiro.json().catch(() => []);
         const jsonFeitos = await resFeitos.json().catch(() => []);
@@ -170,7 +176,7 @@ export default function InicioAlunoPage() {
         }
 
         if (!resTreinos.ok) {
-          setErro((jsonTreinos as any).error || "Erro ao carregar treinos");
+          setErro((jsonTreinos as any)?.error || "Erro ao carregar treinos");
           return;
         }
 
@@ -189,17 +195,50 @@ export default function InicioAlunoPage() {
           return;
         }
 
-        const listaTreinos = (Array.isArray(jsonTreinos) ? jsonTreinos : []).sort(
-          (a: Treino, b: Treino) =>
-            String(b.created_at || "").localeCompare(String(a.created_at || ""))
-        );
+        let treinoNormalizado: Treino | null = null;
+
+        if (jsonTreinos && typeof jsonTreinos === "object" && !Array.isArray(jsonTreinos)) {
+          const treino = jsonTreinos as any;
+
+          if (Array.isArray(treino.exercicios)) {
+            treinoNormalizado = {
+              id: Number(treino.id || 0),
+              dia: treino.dia || treino.titulo || "-",
+              nivel: treino.nivel || null,
+              tipo: treino.tipo || null,
+              personal_nome: treino.personal_nome || "",
+              exercicios: treino.exercicios,
+              created_at: treino.created_at || new Date().toISOString(),
+              titulo: treino.titulo || treino.dia || "Treino atual",
+              objetivo: treino.objetivo || "",
+              observacoes: treino.observacoes || "",
+              origem: treino.origem || "padrao",
+            };
+          }
+        } else if (Array.isArray(jsonTreinos) && jsonTreinos.length > 0) {
+          const treino = jsonTreinos[0] as any;
+
+          treinoNormalizado = {
+            id: Number(treino.id || 0),
+            dia: treino.dia || treino.titulo || "-",
+            nivel: treino.nivel || null,
+            tipo: treino.tipo || null,
+            personal_nome: treino.personal_nome || "",
+            exercicios: Array.isArray(treino.exercicios) ? treino.exercicios : [],
+            created_at: treino.created_at || new Date().toISOString(),
+            titulo: treino.titulo || treino.dia || "Treino atual",
+            objetivo: treino.objetivo || "",
+            observacoes: treino.observacoes || "",
+            origem: treino.origem || "padrao",
+          };
+        }
 
         const listaAvaliacoes = Array.isArray(jsonAvaliacoes) ? jsonAvaliacoes : [];
         const listaPagamentos = Array.isArray(jsonFinanceiro) ? jsonFinanceiro : [];
         const listaFeitos = Array.isArray(jsonFeitos) ? jsonFeitos : [];
 
         setAluno(jsonAluno as Aluno);
-        setTreinos(listaTreinos);
+        setTreinoAtual(treinoNormalizado);
         setAvaliacoes(listaAvaliacoes);
         setPagamentos(listaPagamentos);
         setFeitos(listaFeitos);
@@ -220,10 +259,6 @@ export default function InicioAlunoPage() {
     localStorage.removeItem("treinoprint_aluno_nome");
     router.push("/app-aluno/login");
   };
-
-  const treinoAtual = useMemo(() => {
-    return treinos.length > 0 ? treinos[0] : null;
-  }, [treinos]);
 
   const ultimaAvaliacao = useMemo(() => {
     if (avaliacoes.length === 0) return null;
@@ -256,8 +291,8 @@ export default function InicioAlunoPage() {
     const feitosCount = treinoAtual.exercicios.filter((_, index) =>
       feitos.some(
         (item) =>
-          item.historico_impressao_id === treinoAtual.id &&
-          item.exercicio_indice === index &&
+          Number(item.historico_impressao_id) === Number(treinoAtual.id) &&
+          Number(item.exercicio_indice) === Number(index) &&
           item.feito
       )
     ).length;
@@ -362,17 +397,42 @@ export default function InicioAlunoPage() {
         ) : (
           <>
             <div>
-              <p className="font-semibold text-gray-900">
-                Treino: {treinoAtual.dia || "-"}
-              </p>
-              <p className="text-sm text-gray-600">
-                Nível: {treinoAtual.nivel || "-"}
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-gray-900">
+                  Treino: {treinoAtual.titulo || treinoAtual.dia || "-"}
+                </p>
+
+                {treinoAtual.origem === "personalizado" ? (
+                  <span className="px-2 py-1 rounded-full text-[11px] font-semibold bg-violet-600 text-white">
+                    Personalizado
+                  </span>
+                ) : null}
+              </div>
+
+              {treinoAtual.nivel ? (
+                <p className="text-sm text-gray-600">
+                  Nível: {treinoAtual.nivel}
+                </p>
+              ) : null}
+
+              {treinoAtual.tipo ? (
+                <p className="text-sm text-gray-600">
+                  Tipo: {treinoAtual.tipo}
+                </p>
+              ) : null}
+
               <p className="text-sm text-gray-600">
                 Personal: {treinoAtual.personal_nome || "-"}
               </p>
+
+              {treinoAtual.objetivo ? (
+                <p className="text-sm text-gray-600">
+                  Objetivo: {treinoAtual.objetivo}
+                </p>
+              ) : null}
+
               <p className="text-xs text-gray-500 mt-1">
-                Última impressão: {formatData(treinoAtual.created_at)}
+                Atualizado em: {formatData(treinoAtual.created_at)}
               </p>
             </div>
 

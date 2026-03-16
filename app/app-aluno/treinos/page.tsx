@@ -10,15 +10,21 @@ type Exercicio = {
   repeticoes?: string;
   carga?: string;
   obs?: string;
+  descanso?: string;
 };
 
 type Impressao = {
   id: number;
   dia?: string;
   nivel?: string;
+  tipo?: string;
   personal_nome?: string;
   exercicios?: Exercicio[];
   created_at: string;
+  titulo?: string;
+  objetivo?: string;
+  observacoes?: string;
+  origem?: string;
 };
 
 type ExercicioFeito = {
@@ -61,26 +67,75 @@ export default function TreinosAlunoPage() {
           }),
         ]);
 
-        const jsonTreinos = await resTreinos.json().catch(() => []);
+        const jsonTreinos = await resTreinos.json().catch(() => null);
         const jsonFeitos = await resFeitos.json().catch(() => []);
 
         if (!resTreinos.ok) {
-          setErro((jsonTreinos as any).error || "Erro ao carregar treinos");
+          setErro((jsonTreinos as any)?.error || "Erro ao carregar treinos");
           return;
         }
 
         if (!resFeitos.ok) {
-          setErro((jsonFeitos as any).error || "Erro ao carregar progresso");
+          setErro((jsonFeitos as any)?.error || "Erro ao carregar progresso");
           return;
         }
 
-        const treinosOrdenados = (Array.isArray(jsonTreinos) ? jsonTreinos : []).sort(
-          (a: Impressao, b: Impressao) =>
-            String(b.created_at || "").localeCompare(String(a.created_at || ""))
+        let treinosNormalizados: Impressao[] = [];
+
+        if (Array.isArray(jsonTreinos)) {
+          treinosNormalizados = jsonTreinos.map((item: any, index: number) => ({
+            id: Number(item.id || index + 1),
+            dia: item.dia || item.titulo || "-",
+            nivel: item.nivel || "",
+            tipo: item.tipo || "",
+            personal_nome: item.personal_nome || "",
+            exercicios: Array.isArray(item.exercicios) ? item.exercicios : [],
+            created_at:
+              item.created_at ||
+              item.updated_at ||
+              item.atualizado_em ||
+              new Date().toISOString(),
+            titulo: item.titulo || item.dia || "",
+            objetivo: item.objetivo || "",
+            observacoes: item.observacoes || "",
+            origem: item.origem || "padrao",
+          }));
+        } else if (jsonTreinos && typeof jsonTreinos === "object") {
+          const treino = jsonTreinos as any;
+
+          if (Array.isArray(treino.exercicios)) {
+            treinosNormalizados = [
+              {
+                id: Number(treino.id || 1),
+                dia: treino.dia || treino.titulo || "Treino atual",
+                nivel: treino.nivel || "",
+                tipo: treino.tipo || "",
+                personal_nome: treino.personal_nome || "",
+                exercicios: treino.exercicios,
+                created_at:
+                  treino.created_at ||
+                  treino.updated_at ||
+                  treino.atualizado_em ||
+                  new Date().toISOString(),
+                titulo: treino.titulo || treino.dia || "Treino atual",
+                objetivo: treino.objetivo || "",
+                observacoes: treino.observacoes || "",
+                origem: treino.origem || "padrao",
+              },
+            ];
+          }
+        }
+
+        const treinosOrdenados = treinosNormalizados.sort((a, b) =>
+          String(b.created_at || "").localeCompare(String(a.created_at || ""))
         );
 
         setLista(treinosOrdenados);
         setFeitos(Array.isArray(jsonFeitos) ? jsonFeitos : []);
+
+        if (treinosOrdenados.length > 0) {
+          setTreinoAberto(treinosOrdenados[0].id);
+        }
       } catch {
         setErro("Erro ao carregar treinos");
       } finally {
@@ -98,8 +153,8 @@ export default function TreinosAlunoPage() {
   const isFeito = (historicoId: number, exercicioIndice: number) => {
     return feitos.some(
       (item) =>
-        item.historico_impressao_id === historicoId &&
-        item.exercicio_indice === exercicioIndice &&
+        Number(item.historico_impressao_id) === Number(historicoId) &&
+        Number(item.exercicio_indice) === Number(exercicioIndice) &&
         item.feito
     );
   };
@@ -138,8 +193,8 @@ export default function TreinosAlunoPage() {
         const outros = prev.filter(
           (item) =>
             !(
-              item.historico_impressao_id === historico_impressao_id &&
-              item.exercicio_indice === exercicio_indice
+              Number(item.historico_impressao_id) === Number(historico_impressao_id) &&
+              Number(item.exercicio_indice) === Number(exercicio_indice)
             )
         );
 
@@ -198,7 +253,7 @@ export default function TreinosAlunoPage() {
       <section className="bg-white rounded-2xl shadow p-5">
         <h1 className="text-xl font-black text-gray-900">Meus treinos</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Último treino impresso e histórico de treinos
+          Último treino disponível e histórico de treinos
         </p>
       </section>
 
@@ -238,8 +293,14 @@ export default function TreinosAlunoPage() {
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <p className="font-semibold text-gray-900">
-                    Treino: {treinoAtual.dia || "-"}
+                    Treino: {treinoAtual.titulo || treinoAtual.dia || "-"}
                   </p>
+
+                  {treinoAtual.origem === "personalizado" ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold bg-violet-600 text-white">
+                      Personalizado
+                    </span>
+                  ) : null}
 
                   {treinoAtualConcluido ? (
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold bg-green-600 text-white">
@@ -249,14 +310,24 @@ export default function TreinosAlunoPage() {
                   ) : null}
                 </div>
 
-                <p className="text-sm text-gray-600">
-                  Nível: {treinoAtual.nivel || "-"}
-                </p>
+                {treinoAtual.nivel ? (
+                  <p className="text-sm text-gray-600">
+                    Nível: {treinoAtual.nivel}
+                  </p>
+                ) : null}
+
                 <p className="text-sm text-gray-600">
                   Personal: {treinoAtual.personal_nome || "-"}
                 </p>
+
+                {treinoAtual.objetivo ? (
+                  <p className="text-sm text-gray-600">
+                    Objetivo: {treinoAtual.objetivo}
+                  </p>
+                ) : null}
+
                 <p className="text-xs text-gray-500 mt-1">
-                  Impresso em: {formatDataHora(treinoAtual.created_at)}
+                  Atualizado em: {formatDataHora(treinoAtual.created_at)}
                 </p>
 
                 <div className="mt-3 space-y-2">
@@ -298,6 +369,12 @@ export default function TreinosAlunoPage() {
 
             {treinoAberto === treinoAtual.id && (
               <div className="border-t p-4 space-y-2">
+                {treinoAtual.observacoes ? (
+                  <div className="rounded-xl bg-zinc-50 border p-3 text-sm text-zinc-700">
+                    {treinoAtual.observacoes}
+                  </div>
+                ) : null}
+
                 {Array.isArray(treinoAtual.exercicios) &&
                 treinoAtual.exercicios.length > 0 ? (
                   treinoAtual.exercicios.map((ex, index) => {
@@ -328,11 +405,17 @@ export default function TreinosAlunoPage() {
                               {ex.repeticoes || "-"} | Carga: {ex.carga || "-"}
                             </p>
 
-                            {ex.obs && (
+                            {ex.descanso ? (
+                              <p className="text-xs text-gray-600">
+                                Descanso: {ex.descanso}
+                              </p>
+                            ) : null}
+
+                            {ex.obs ? (
                               <p className="text-xs text-gray-500 mt-1">
                                 Obs: {ex.obs}
                               </p>
-                            )}
+                            ) : null}
                           </div>
 
                           <button
@@ -392,8 +475,14 @@ export default function TreinosAlunoPage() {
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
                       <p className="font-semibold text-gray-900">
-                        Treino: {item.dia || "-"}
+                        Treino: {item.titulo || item.dia || "-"}
                       </p>
+
+                      {item.origem === "personalizado" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold bg-violet-600 text-white">
+                          Personalizado
+                        </span>
+                      ) : null}
 
                       {concluido ? (
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold bg-green-600 text-white">
@@ -403,16 +492,18 @@ export default function TreinosAlunoPage() {
                       ) : null}
                     </div>
 
-                    <p className="text-sm text-gray-600">
-                      Nível: {item.nivel || "-"}
-                    </p>
+                    {item.nivel ? (
+                      <p className="text-sm text-gray-600">
+                        Nível: {item.nivel}
+                      </p>
+                    ) : null}
 
                     <p className="text-sm text-gray-600">
                       Personal: {item.personal_nome || "-"}
                     </p>
 
                     <p className="text-xs text-gray-500 mt-1">
-                      Impresso em: {formatDataHora(item.created_at)}
+                      Atualizado em: {formatDataHora(item.created_at)}
                     </p>
 
                     <div className="mt-3 space-y-2">
@@ -444,8 +535,13 @@ export default function TreinosAlunoPage() {
 
                 {aberto && (
                   <div className="border-t p-4 space-y-2">
-                    {Array.isArray(item.exercicios) &&
-                    item.exercicios.length > 0 ? (
+                    {item.observacoes ? (
+                      <div className="rounded-xl bg-zinc-50 border p-3 text-sm text-zinc-700">
+                        {item.observacoes}
+                      </div>
+                    ) : null}
+
+                    {Array.isArray(item.exercicios) && item.exercicios.length > 0 ? (
                       item.exercicios.map((ex, index) => {
                         const feito = isFeito(item.id, index);
                         const key = `${item.id}-${index}`;
@@ -473,15 +569,20 @@ export default function TreinosAlunoPage() {
 
                                 <p className="text-xs text-gray-600">
                                   Séries: {ex.series || "-"} | Reps:{" "}
-                                  {ex.repeticoes || "-"} | Carga:{" "}
-                                  {ex.carga || "-"}
+                                  {ex.repeticoes || "-"} | Carga: {ex.carga || "-"}
                                 </p>
 
-                                {ex.obs && (
+                                {ex.descanso ? (
+                                  <p className="text-xs text-gray-600">
+                                    Descanso: {ex.descanso}
+                                  </p>
+                                ) : null}
+
+                                {ex.obs ? (
                                   <p className="text-xs text-gray-500 mt-1">
                                     Obs: {ex.obs}
                                   </p>
-                                )}
+                                ) : null}
                               </div>
 
                               <button
