@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-
 import {
   ChartColumnBig,
   IdCard,
@@ -53,6 +52,29 @@ type Impressao = {
   created_at: string;
 };
 
+type HistoricoTreino = {
+  id: number;
+  aluno_id?: number | null;
+  aluno_nome?: string | null;
+  personal_nome?: string | null;
+  semana?: string | null;
+  dia?: string | null;
+  nivel?: string | null;
+  tipo?: string | null;
+  exercicios?: any[] | null;
+  created_at: string;
+  origem?: string | null;
+  codigo_treino?: string | null;
+  treino_personalizado_id?: number | null;
+  titulo?: string | null;
+  objetivo?: string | null;
+  observacoes?: string | null;
+  divisao?: string | null;
+  frequencia_semana?: number | null;
+  origem_geracao?: string | null;
+  versao_treino?: number | null;
+};
+
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
   const academiaId =
     typeof window !== "undefined"
@@ -86,6 +108,13 @@ function formatData(data?: string | null) {
   return dt.toLocaleDateString("pt-BR");
 }
 
+function formatDataHora(data?: string | null) {
+  if (!data) return "-";
+  const dt = new Date(data);
+  if (Number.isNaN(dt.getTime())) return "-";
+  return dt.toLocaleString("pt-BR");
+}
+
 export default function AlunoPage() {
   const params = useParams();
   const router = useRouter();
@@ -115,6 +144,42 @@ export default function AlunoPage() {
   const [objetivo, setObjetivo] = useState("");
   const [pesoMeta, setPesoMeta] = useState("");
   const [enviandoFoto, setEnviandoFoto] = useState(false);
+
+  const [historicoTreinos, setHistoricoTreinos] = useState<HistoricoTreino[]>(
+    []
+  );
+  const [carregandoHistoricoTreinos, setCarregandoHistoricoTreinos] =
+    useState(false);
+
+  const carregarHistoricoTreinos = async (alunoId: number) => {
+    try {
+      setCarregandoHistoricoTreinos(true);
+
+      const res = await apiFetch(
+        `/api/alunos/${alunoId}/historico-treinos?limit=6`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      const json = await res.json().catch(() => []);
+
+      if (!res.ok) {
+        console.error(
+          (json as any).error || "Erro ao carregar histórico de treinos"
+        );
+        setHistoricoTreinos([]);
+        return;
+      }
+
+      setHistoricoTreinos(Array.isArray(json) ? json : []);
+    } catch (error) {
+      console.error("Erro ao carregar histórico de treinos:", error);
+      setHistoricoTreinos([]);
+    } finally {
+      setCarregandoHistoricoTreinos(false);
+    }
+  };
 
   const carregar = async () => {
     try {
@@ -165,6 +230,12 @@ export default function AlunoPage() {
           ? String(jsonAluno.peso_meta)
           : ""
       );
+
+      if (jsonAluno?.id) {
+        await carregarHistoricoTreinos(Number(jsonAluno.id));
+      } else if (id) {
+        await carregarHistoricoTreinos(Number(id));
+      }
     } catch {
       setErro("Erro ao carregar ficha do aluno");
     } finally {
@@ -391,16 +462,16 @@ export default function AlunoPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          
           <button
-  onClick={() => router.push(`/alunos/${aluno.id}/treino-personalizado`)}
-  className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl px-4 py-2 flex items-center gap-2"
->
-  <PencilRuler size={16} />
-  Treino personalizado
-</button>
-<div className="relative" ref={menuAvalRef}>
- <button
+            onClick={() => router.push(`/alunos/${aluno.id}/treino-personalizado`)}
+            className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl px-4 py-2 flex items-center gap-2"
+          >
+            <PencilRuler size={16} />
+            Treino personalizado
+          </button>
+
+          <div className="relative" ref={menuAvalRef}>
+            <button
               type="button"
               onClick={() => setMenuAval((v) => !v)}
               className="flex items-center gap-2 bg-black text-white rounded-xl px-4 py-3"
@@ -409,7 +480,6 @@ export default function AlunoPage() {
               Avaliação física
               <ChevronDown size={15} />
             </button>
-            
 
             {menuAval && (
               <div className="absolute left-0 top-full mt-2 w-64 bg-white border border-black/10 rounded-2xl shadow-xl overflow-hidden z-50">
@@ -762,8 +832,10 @@ export default function AlunoPage() {
       </section>
 
       <section className="bg-white p-6 rounded-2xl shadow print-card">
-        <h2 className="font-semibold mb-4">Treinos impressos recentes</h2>
+  <h2 className="font-semibold mb-4">Treinos impressos recentes</h2>
 
+       <div className="max-h-[320px] overflow-y-auto pr-2">
+        
         {impressoes.length === 0 ? (
           <p className="text-gray-500">Nenhum treino impresso encontrado.</p>
         ) : (
@@ -788,6 +860,122 @@ export default function AlunoPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+      </section>
+
+      <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-4 print-card">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-bold text-gray-900">
+            Histórico de versões do treino
+          </h2>
+
+          <button
+            type="button"
+            onClick={() => carregarHistoricoTreinos(Number(aluno.id))}
+            className="border rounded-xl px-4 py-2 text-sm no-print"
+          >
+            Atualizar
+          </button>
+        </div>
+
+        {carregandoHistoricoTreinos ? (
+          <p className="text-gray-500">Carregando histórico...</p>
+        ) : historicoTreinos.length === 0 ? (
+          <p className="text-gray-500">Nenhum histórico de treino encontrado.</p>
+        ) : (
+          <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3">
+            {historicoTreinos.map((item) => {
+              const totalExercicios = Array.isArray(item.exercicios)
+                ? item.exercicios.length
+                : 0;
+
+              return (
+                <div
+                  key={item.id}
+                  className="border rounded-2xl p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-gray-900">
+                        {item.titulo || `Treino ${item.codigo_treino || "-"}`}
+                      </p>
+
+                      <span className="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-700">
+                        Versão {item.versao_treino || 1}
+                      </span>
+
+                      {item.origem ? (
+                        <span className="text-xs px-3 py-1 rounded-full bg-blue-50 text-blue-700">
+                          {item.origem}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <p className="text-sm text-gray-600">
+                      Código: {item.codigo_treino || "-"} • Dia: {item.dia || "-"}
+                    </p>
+
+                    <p className="text-sm text-gray-600">
+                      Objetivo: {item.objetivo || "-"} • Divisão:{" "}
+                      {item.divisao || "-"}
+                    </p>
+
+                    <p className="text-sm text-gray-600">
+                      Nível: {item.nivel || "-"} • Frequência:{" "}
+                      {item.frequencia_semana || "-"}x/semana
+                    </p>
+
+                    <p className="text-sm text-gray-600">
+                      Personal: {item.personal_nome || "-"}
+                    </p>
+
+                    <p className="text-xs text-gray-500">
+                      {totalExercicios} exercício(s) •{" "}
+                      {formatDataHora(item.created_at)}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 flex-wrap no-print">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        alert(
+                          Array.isArray(item.exercicios)
+                            ? item.exercicios
+                                .map(
+                                  (ex: any, idx: number) =>
+                                    `${idx + 1}. ${
+                                      ex.nome_exercicio_snapshot ||
+                                      ex.nome ||
+                                      "-"
+                                    }`
+                                )
+                                .join("\n")
+                            : "Nenhum exercício encontrado"
+                        );
+                      }}
+                      className="bg-zinc-800 text-white px-4 py-2 rounded-xl"
+                    >
+                      Ver exercícios
+                    </button>
+
+                    {item.treino_personalizado_id ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(`/alunos/${aluno.id}/treino-personalizado`)
+                        }
+                        className="bg-blue-600 text-white px-4 py-2 rounded-xl"
+                      >
+                        Abrir treino
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

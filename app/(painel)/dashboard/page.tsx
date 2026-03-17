@@ -1,113 +1,28 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import {
+  Users,
+  UserCheck,
+  Printer,
+  Dumbbell,
+  Wallet,
+  AlertCircle,
+  Activity,
+  Clock3,
+} from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
-  PieChart,
-  Pie,
-  Cell,
+  CartesianGrid,
   LineChart,
   Line,
   Legend,
 } from "recharts";
-import {
-  Users,
-  UserCheck,
-  Dumbbell,
-  CalendarDays,
-  AlertTriangle,
-  Wallet,
-  TrendingUp,
-  CreditCard,
-  ArrowRight,
-  Printer,
-  Landmark,
-  Activity,
-  Target,
-  ShieldAlert,
-  BarChart3,
-  Clock3,
-  Trophy,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import SystemLoader from "@/components/SystemLoader";
-import SystemError from "@/components/SystemError";
-
-type TreinoDia = {
-  dia: string;
-  total: number;
-};
-
-type TreinoNivel = {
-  nivel: string;
-  total: number;
-};
-
-type TreinoRecente = {
-  horario: string;
-  aluno: string;
-  dia: string;
-};
-
-type TreinoHorario = {
-  hora: string;
-  total: number;
-};
-
-type RankingItem = {
-  nome: string;
-  total: number;
-};
-
-type DiaMovimento = {
-  dia: string;
-  total: number;
-};
-
-type UltimoPagamento = {
-  id: number;
-  aluno: string;
-  valor: number;
-  forma_pagamento?: string | null;
-  data_pagamento?: string | null;
-};
-
-type AlunoVencido = {
-  aluno: string;
-  valor: number;
-  vencimento: string;
-};
-
-type DashboardData = {
-  alunosCadastrados: number;
-  alunosAtivos: number;
-  treinosHoje: number;
-  personalMaisAtivo: string;
-  diaMaisUsado: string;
-  mensalidadesEmAberto: number;
-  inadimplentes: number;
-  treinosPorDia: TreinoDia[];
-  treinosPorNivel: TreinoNivel[];
-  treinosRecentes: TreinoRecente[];
-  treinosPorHorario: TreinoHorario[];
-  rankingPersonal: RankingItem[];
-  alunosMaisTreinam: RankingItem[];
-  diasMaisMovimentados: DiaMovimento[];
-  ultimosPagamentos: UltimoPagamento[];
-  alunosVencidos: AlunoVencido[];
-  financeiro: {
-    receitaMes: number;
-    despesas: number;
-    pontoEquilibrio: number;
-  };
-};
 
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
   const academiaId =
@@ -124,235 +39,145 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
   });
 }
 
-function formatBRL(valor: number) {
+function formatBRL(valor?: number) {
   return Number(valor || 0).toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
   });
 }
 
-function formatDataHora(data?: string | null) {
-  if (!data) return "-";
-  const dt = new Date(data);
-  if (Number.isNaN(dt.getTime())) return "-";
-  return dt.toLocaleString("pt-BR");
-}
+type DashboardResumo = {
+  cards: {
+    alunos_cadastrados: number;
+    alunos_ativos: number;
+    treinos_impressos_hoje: number;
+    treinos_personalizados_ativos: number;
+    faturamento_pago: number;
+    faturamento_em_aberto: number;
+    acessos_liberados_hoje: number;
+  };
+  ranking_personais: { nome: string; total: number }[];
+  horarios_movimento: { hora: string; total: number }[];
+  top_exercicios: { nome: string; total: number }[];
+  top_alunos: { nome: string; total: number }[];
+  treinos_por_dia_semana: { dia: string; total: number }[];
+  faturamento_por_competencia: { competencia: string; pago: number; aberto: number }[];
+};
 
-function formatData(data?: string | null) {
-  if (!data) return "-";
-  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(data);
-  const dt = isDateOnly ? new Date(`${data}T00:00:00`) : new Date(data);
-  if (Number.isNaN(dt.getTime())) return "-";
-  return dt.toLocaleDateString("pt-BR");
-}
-
-function PremiumCard({
-  title,
-  value,
-  subtitle,
-  icon,
-  valueClassName = "",
+function CardResumo({
+  titulo,
+  valor,
+  icon: Icon,
+  cor = "text-black",
 }: {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: React.ReactNode;
-  valueClassName?: string;
+  titulo: string;
+  valor: string | number;
+  icon: any;
+  cor?: string;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35 }}
-      className="bg-white rounded-[28px] shadow-sm border border-black/5 p-4 overflow-hidden relative"
-    >
-      <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-zinc-100 -mr-8 -mt-8" />
-
-      <div className="relative flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-sm text-zinc-500">{title}</p>
-          <p className={`text-xl md:text-2xl font-black mt-2 break-words ${valueClassName}`}>
-            {value}
-          </p>
-          {subtitle ? <p className="text-sm text-zinc-400 mt-2">{subtitle}</p> : null}
-        </div>
-
-        <div className="w-12 h-12 rounded-2xl bg-black text-white flex items-center justify-center shrink-0">
-          {icon}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function SectionCard({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-[28px] shadow-sm border border-black/5 p-4"
-    >
-      <div className="mb-4">
-        <h2 className="font-bold text-lg text-zinc-900">{title}</h2>
-        {subtitle ? <p className="text-sm text-zinc-500 mt-1">{subtitle}</p> : null}
-      </div>
-      {children}
-    </motion.div>
-  );
-}
-
-function QuickAction({
-  title,
-  description,
-  icon,
-  onClick,
-}: {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="group w-full text-left rounded-2xl border border-black/5 bg-white px-4 py-4 shadow-sm hover:shadow-md transition"
-    >
+    <div className="bg-white rounded-2xl shadow p-5 border border-black/5">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center shrink-0">
-            {icon}
-          </div>
-
-          <div className="leading-tight min-w-0">
-            <p className="font-semibold text-sm text-zinc-900">{title}</p>
-            <p className="text-xs text-zinc-500">{description}</p>
-          </div>
-        </div>
-
-        <ArrowRight
-          size={16}
-          className="text-zinc-400 transition group-hover:translate-x-1 shrink-0"
-        />
+        <p className="text-sm text-gray-500">{titulo}</p>
+        <Icon size={18} className={cor} />
       </div>
-    </button>
+      <p className={`text-2xl font-black mt-3 ${cor}`}>{valor}</p>
+    </div>
+  );
+}
+
+function ListaRanking({
+  titulo,
+  itens,
+  label,
+}: {
+  titulo: string;
+  itens: { nome: string; total: number }[];
+  label: string;
+}) {
+  return (
+    <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
+      <h2 className="text-xl font-bold text-gray-900 mb-4">{titulo}</h2>
+
+      {itens.length === 0 ? (
+        <p className="text-gray-500">Sem dados.</p>
+      ) : (
+        <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
+          {itens.map((item, index) => (
+            <div
+              key={`${item.nome}-${index}`}
+              className="flex items-center justify-between border rounded-xl px-4 py-3"
+            >
+              <div>
+                <p className="font-semibold text-gray-900">{item.nome}</p>
+                <p className="text-sm text-gray-500">
+                  {item.total} {label}
+                </p>
+              </div>
+              <span className="text-xs px-3 py-1 rounded-full bg-black text-white">
+                #{index + 1}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
 export default function DashboardPage() {
-  const router = useRouter();
-
-  const [dados, setDados] = useState<DashboardData | null>(null);
+  const [resumo, setResumo] = useState<DashboardResumo | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
-  const [periodo, setPeriodo] = useState("mes");
 
-  const nomeAcademia =
-    typeof window !== "undefined"
-      ? localStorage.getItem("treinoprint_academia_nome") || "sua academia"
-      : "sua academia";
+  const carregar = async () => {
+    try {
+      setErro("");
+      setLoading(true);
+
+      const res = await apiFetch("/api/dashboard/resumo", {
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setErro((json as any).error || "Erro ao carregar dashboard");
+        return;
+      }
+
+      setResumo(json as DashboardResumo);
+    } catch {
+      setErro("Erro ao carregar dashboard");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const carregar = async () => {
-      try {
-        setLoading(true);
-        setErro("");
-
-        const url = `/api/dashboard?periodo=${periodo}`;
-        const res = await apiFetch(url, { cache: "no-store" });
-        const json = await res.json().catch(() => ({}));
-
-        if (!res.ok) {
-          setErro((json as any).error || "Erro ao carregar dashboard");
-          return;
-        }
-
-        setDados(json as DashboardData);
-      } catch {
-        setErro("Erro ao carregar dashboard");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     carregar();
-  }, [periodo]);
+  }, []);
 
-  const pieData = useMemo(
-    () =>
-      (dados?.treinosPorNivel || []).map((item) => ({
-        name: item.nivel,
-        value: item.total,
-      })),
-    [dados]
-  );
-
-  const pieColors = ["#111827", "#374151", "#6B7280", "#9CA3AF", "#D1D5DB"];
-
-  const lucroMes = useMemo(() => {
-    if (!dados) return 0;
-    return Number(dados.financeiro.receitaMes || 0) - Number(dados.financeiro.despesas || 0);
-  }, [dados]);
-
-  const financeiroLinha = useMemo(() => {
-    if (!dados) return [];
-    return [
-      {
-        nome: "Financeiro",
-        receita: dados.financeiro.receitaMes,
-        despesas: dados.financeiro.despesas,
-        equilibrio: dados.financeiro.pontoEquilibrio,
-        lucro: lucroMes,
-      },
-    ];
-  }, [dados, lucroMes]);
-
-  const taxaAtividade = useMemo(() => {
-    if (!dados?.alunosCadastrados) return 0;
-    return Math.round(
-      (Number(dados.alunosAtivos || 0) / Number(dados.alunosCadastrados || 0)) * 100
-    );
-  }, [dados]);
-
-  const taxaInadimplencia = useMemo(() => {
-    if (!dados?.alunosAtivos) return 0;
-    return Math.round(
-      (Number(dados.inadimplentes || 0) / Number(dados.alunosAtivos || 0)) * 100
-    );
-  }, [dados]);
-
-  const nivelMaisUsado = useMemo(() => {
-    if (!dados?.treinosPorNivel?.length) return "-";
-    return [...dados.treinosPorNivel].sort((a, b) => b.total - a.total)[0]?.nivel || "-";
-  }, [dados]);
-
-  const totalTreinosPeriodo = useMemo(() => {
-    return (dados?.treinosPorDia || []).reduce((acc, item) => acc + Number(item.total || 0), 0);
-  }, [dados]);
+  const picoHorario = useMemo(() => {
+    if (!resumo?.horarios_movimento?.length) return null;
+    return [...resumo.horarios_movimento].sort((a, b) => b.total - a.total)[0];
+  }, [resumo]);
 
   if (loading) {
-    return (
-      <SystemLoader
-        titulo="TreinoPrint"
-        subtitulo="Carregando dashboard..."
-      />
-    );
+    return <p className="p-6">Carregando dashboard...</p>;
   }
 
-  if (erro || !dados) {
+  if (erro || !resumo) {
     return (
-      <SystemError
-        titulo="Erro ao carregar dashboard"
-        mensagem={erro || "Não foi possível carregar o painel."}
-        onTentarNovamente={() => window.location.reload()}
-      />
+      <div className="p-6 space-y-4">
+        <p className="text-red-600">{erro || "Erro ao carregar dashboard"}</p>
+        <button
+          onClick={carregar}
+          className="bg-black text-white px-4 py-3 rounded-xl"
+        >
+          Tentar novamente
+        </button>
+      </div>
     );
   }
 
@@ -363,35 +188,20 @@ export default function DashboardPage() {
 
         <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
           <div>
-            <p className="text-sm text-zinc-300">Painel principal</p>
+            <p className="text-sm text-zinc-300">Painel geral</p>
             <h1 className="text-3xl md:text-4xl font-black mt-2">
-              Bem-vindo ao Dashboard
+              Dashboard TreinoPrint
             </h1>
             <p className="text-zinc-300 mt-3 max-w-2xl">
-              Acompanhe a visão geral de {nomeAcademia} em tempo real.
+              Resumo operacional, financeiro e uso do sistema.
             </p>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <div className="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
-                <p className="text-xs text-zinc-300">Personal mais ativo</p>
-                <p className="font-bold mt-1">{dados.personalMaisAtivo || "-"}</p>
-              </div>
-
-              <div className="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
-                <p className="text-xs text-zinc-300">Dia mais usado</p>
-                <p className="font-bold mt-1">{dados.diaMaisUsado || "-"}</p>
-              </div>
-
-              <div className="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
-                <p className="text-xs text-zinc-300">Nível mais usado</p>
-                <p className="font-bold mt-1">{nivelMaisUsado}</p>
-              </div>
-            </div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
-            <p className="text-white/60 text-xs">Status do sistema</p>
-            <p className="text-xl font-black mt-1">TreinoPrint Online</p>
+          <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[260px]">
+            <p className="text-white/60 text-xs">Horário de pico</p>
+            <p className="text-xl font-black mt-1">
+              {picoHorario ? `${picoHorario.hora} • ${picoHorario.total} registros` : "-"}
+            </p>
             <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
               <Activity size={16} />
               Operação ativa
@@ -400,423 +210,142 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <SectionCard
-        title="Filtros e atalhos"
-        subtitle="Escolha o período e acesse rapidamente os módulos principais"
-      >
-        <div className="space-y-4">
-          <div className="flex flex-col md:flex-row md:items-start md:justify gap-4">
-            <div />
-            <div className="w-full md:w-[200px]">
-              <label className="block text-sm font-medium text-zinc-600 mb-2">
-                Período
-              </label>
-              <select
-                value={periodo}
-                onChange={(e) => setPeriodo(e.target.value)}
-                className="border rounded-2xl p-3 w-full"
-              >
-                <option value="hoje">Hoje</option>
-                <option value="semana">Últimos 7 dias</option>
-                <option value="mes">Mês atual</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            <QuickAction
-              title="Alunos"
-              description="Gerenciar cadastros e fichas"
-              icon={<Users size={20} />}
-              onClick={() => router.push("/alunos")}
-            />
-            <QuickAction
-              title="Pagamentos"
-              description="Receber mensalidades"
-              icon={<CreditCard size={20} />}
-              onClick={() => router.push("/pagamentos")}
-            />
-            <QuickAction
-              title="Financeiro"
-              description="Despesas e relatórios"
-              icon={<Landmark size={20} />}
-              onClick={() => router.push("/financeiro")}
-            />
-            <QuickAction
-              title="Imprimir treinos"
-              description="Acessar impressão"
-              icon={<Printer size={20} />}
-              onClick={() => router.push("/imprimir")}
-            />
-          </div>
-        </div>
-      </SectionCard>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <PremiumCard
-          title="Alunos cadastrados"
-          value={dados.alunosCadastrados}
-          icon={<Users size={22} />}
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <CardResumo
+          titulo="Alunos cadastrados"
+          valor={resumo.cards.alunos_cadastrados}
+          icon={Users}
+          cor="text-blue-600"
         />
-        <PremiumCard
-          title="Alunos ativos"
-          value={dados.alunosAtivos}
-          subtitle={`${taxaAtividade}% da base ativa`}
-          icon={<UserCheck size={22} />}
+        <CardResumo
+          titulo="Alunos ativos"
+          valor={resumo.cards.alunos_ativos}
+          icon={UserCheck}
+          cor="text-green-600"
         />
-        <PremiumCard
-          title="Treinos no período"
-          value={totalTreinosPeriodo}
-          subtitle={periodo === "hoje" ? "Movimento de hoje" : "Total no período"}
-          icon={<Dumbbell size={22} />}
+        <CardResumo
+          titulo="Treinos impressos hoje"
+          valor={resumo.cards.treinos_impressos_hoje}
+          icon={Printer}
+          cor="text-violet-600"
         />
-        <PremiumCard
-          title="Treinos hoje"
-          value={dados.treinosHoje}
-          subtitle="Últimas 24h / dia atual"
-          icon={<CalendarDays size={22} />}
+        <CardResumo
+          titulo="Treinos personalizados ativos"
+          valor={resumo.cards.treinos_personalizados_ativos}
+          icon={Dumbbell}
+          cor="text-orange-600"
         />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <PremiumCard
-          title="Mensalidades em aberto"
-          value={dados.mensalidadesEmAberto}
-          subtitle="Lançamentos pendentes"
-          icon={<CreditCard size={20} />}
-          valueClassName="text-yellow-600"
+        <CardResumo
+          titulo="Faturamento pago"
+          valor={formatBRL(resumo.cards.faturamento_pago)}
+          icon={Wallet}
+          cor="text-emerald-600"
         />
-        <PremiumCard
-          title="Inadimplentes"
-          value={dados.inadimplentes}
-          subtitle={`${taxaInadimplencia}% dos ativos`}
-          icon={<AlertTriangle size={22} />}
-          valueClassName="text-red-600"
+        <CardResumo
+          titulo="Em aberto"
+          valor={formatBRL(resumo.cards.faturamento_em_aberto)}
+          icon={AlertCircle}
+          cor="text-yellow-600"
         />
-        <PremiumCard
-          title="Receita do período"
-          value={formatBRL(dados.financeiro.receitaMes)}
-          icon={<Wallet size={20} />}
-          valueClassName="text-green-600"
+        <CardResumo
+          titulo="Acessos liberados hoje"
+          valor={resumo.cards.acessos_liberados_hoje}
+          icon={Activity}
+          cor="text-cyan-600"
         />
-        <PremiumCard
-          title="Lucro do período"
-          value={formatBRL(lucroMes)}
-          subtitle="Receita - despesas"
-          icon={<TrendingUp size={22} />}
-          valueClassName={lucroMes >= 0 ? "text-violet-600" : "text-red-600"}
+        <CardResumo
+          titulo="Horário mais movimentado"
+          valor={picoHorario ? picoHorario.hora : "-"}
+          icon={Clock3}
+          cor="text-pink-600"
         />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <PremiumCard
-          title="Personal mais ativo"
-          value={dados.personalMaisAtivo || "-"}
-          subtitle="Maior número de impressões"
-          icon={<Target size={22} />}
-        />
-        <PremiumCard
-          title="Dia mais usado"
-          value={dados.diaMaisUsado || "-"}
-          subtitle="Treino mais recorrente"
-          icon={<BarChart3 size={22} />}
-        />
-        <PremiumCard
-          title="Nível mais usado"
-          value={nivelMaisUsado}
-          subtitle="Maior participação no período"
-          icon={<Dumbbell size={22} />}
-        />
-        <PremiumCard
-          title="Risco de inadimplência"
-          value={`${taxaInadimplencia}%`}
-          subtitle="Baseado nos alunos ativos"
-          icon={<ShieldAlert size={22} />}
-          valueClassName={taxaInadimplencia > 20 ? "text-red-600" : "text-amber-600"}
-        />
-      </div>
+      </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <SectionCard
-          title="Treinos por dia"
-          subtitle="Distribuição dos treinos no período selecionado"
-        >
-          <div className="h-72">
+        <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Treinos por dia da semana
+          </h2>
+
+          <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dados.treinosPorDia}>
+              <BarChart data={resumo.treinos_por_dia_semana}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="dia" />
-                <YAxis allowDecimals={false} />
+                <YAxis />
                 <Tooltip />
-                <Bar dataKey="total" radius={[10, 10, 0, 0]} />
+                <Bar dataKey="total" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </SectionCard>
+        </section>
 
-        <SectionCard
-          title="Treinos por nível"
-          subtitle="Participação dos níveis no período"
-        >
-          <div className="h-72">
-            {pieData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-zinc-500">
-                Sem dados no período.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Tooltip />
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    outerRadius={100}
-                    label
-                  >
-                    {pieData.map((_, index) => (
-                      <Cell key={index} fill={pieColors[index % pieColors.length]} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </SectionCard>
-      </div>
+        <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Faturamento por competência
+          </h2>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <SectionCard
-          title="Treinos por horário"
-          subtitle="Descubra os horários de maior movimento"
-        >
-          <div className="h-72">
+          <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dados.treinosPorHorario}>
+              <LineChart data={resumo.faturamento_por_competencia}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="hora" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="total" radius={[10, 10, 0, 0]} />
-              </BarChart>
+                <XAxis dataKey="competencia" />
+                <YAxis />
+                <Tooltip
+                  formatter={(value: any) => formatBRL(Number(value || 0))}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="pago" />
+                <Line type="monotone" dataKey="aberto" />
+              </LineChart>
             </ResponsiveContainer>
           </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Dias mais movimentados"
-          subtitle="Ranking dos dias com mais treinos"
-        >
-          {dados.diasMaisMovimentados.length === 0 ? (
-            <p className="text-sm text-zinc-500">Sem dados no período.</p>
-          ) : (
-            <div className="space-y-3">
-              {dados.diasMaisMovimentados.map((item, index) => (
-                <div
-                  key={`${item.dia}-${index}`}
-                  className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3 flex items-center justify-between gap-3"
-                >
-                  <div>
-                    <p className="font-semibold text-zinc-900">{item.dia}</p>
-                    <p className="text-sm text-zinc-500">Movimento no período</p>
-                  </div>
-
-                  <p className="font-black text-emerald-600">{item.total}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </SectionCard>
+        </section>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <SectionCard
-          title="Ranking de personal"
-          subtitle="Profissionais com mais treinos entregues"
-        >
-          {dados.rankingPersonal.length === 0 ? (
-            <p className="text-sm text-zinc-500">Sem dados no período.</p>
-          ) : (
-            <div className="space-y-3">
-              {dados.rankingPersonal.map((item, index) => (
-                <div
-                  key={`${item.nome}-${index}`}
-                  className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3 flex items-center justify-between gap-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center">
-                      <Trophy size={18} />
-                    </div>
+        <ListaRanking
+          titulo="Ranking de personais"
+          itens={resumo.ranking_personais}
+          label="treino(s)"
+        />
 
-                    <div>
-                      <p className="font-semibold text-zinc-900">{item.nome}</p>
-                      <p className="text-sm text-zinc-500">Treinos entregues</p>
-                    </div>
-                  </div>
-
-                  <p className="font-black text-blue-600">{item.total}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title="Alunos que mais treinam"
-          subtitle="Quem mais recebeu treino no período"
-        >
-          {dados.alunosMaisTreinam.length === 0 ? (
-            <p className="text-sm text-zinc-500">Sem dados no período.</p>
-          ) : (
-            <div className="space-y-3">
-              {dados.alunosMaisTreinam.map((item, index) => (
-                <div
-                  key={`${item.nome}-${index}`}
-                  className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3 flex items-center justify-between gap-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center">
-                      <Users size={18} />
-                    </div>
-
-                    <div>
-                      <p className="font-semibold text-zinc-900">{item.nome}</p>
-                      <p className="text-sm text-zinc-500">Treinos recebidos</p>
-                    </div>
-                  </div>
-
-                  <p className="font-black text-violet-600">{item.total}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </SectionCard>
+        <ListaRanking
+          titulo="Top exercícios"
+          itens={resumo.top_exercicios}
+          label="uso(s)"
+        />
       </div>
-
-      <SectionCard title="Financeiro" subtitle="Resumo consolidado do período">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-          <PremiumCard
-            title="Receita"
-            value={formatBRL(dados.financeiro.receitaMes)}
-            icon={<Wallet size={20} />}
-            valueClassName="text-green-600"
-          />
-          <PremiumCard
-            title="Despesas"
-            value={formatBRL(dados.financeiro.despesas)}
-            icon={<AlertTriangle size={20} />}
-            valueClassName="text-red-600"
-          />
-          <PremiumCard
-            title="Ponto de equilíbrio"
-            value={formatBRL(dados.financeiro.pontoEquilibrio)}
-            icon={<CreditCard size={20} />}
-            valueClassName="text-blue-600"
-          />
-          <PremiumCard
-            title="Lucro estimado"
-            value={formatBRL(lucroMes)}
-            icon={<TrendingUp size={20} />}
-            valueClassName={lucroMes >= 0 ? "text-violet-600" : "text-red-600"}
-          />
-        </div>
-
-        <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={financeiroLinha}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="nome" />
-              <YAxis />
-              <Tooltip formatter={(value: number) => formatBRL(Number(value))} />
-              <Legend />
-              <Line type="monotone" dataKey="receita" stroke="#16a34a" strokeWidth={3} />
-              <Line type="monotone" dataKey="despesas" stroke="#dc2626" strokeWidth={3} />
-              <Line type="monotone" dataKey="equilibrio" stroke="#2563eb" strokeWidth={3} />
-              <Line type="monotone" dataKey="lucro" stroke="#7c3aed" strokeWidth={3} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </SectionCard>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <SectionCard title="Últimos pagamentos" subtitle="Pagamentos confirmados recentemente">
-          {dados.ultimosPagamentos.length === 0 ? (
-            <p className="text-sm text-zinc-500">Nenhum pagamento recente.</p>
-          ) : (
-            <div className="space-y-3">
-              {dados.ultimosPagamentos.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3 flex items-center justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold text-zinc-900 truncate">{item.aluno}</p>
-                    <p className="text-sm text-zinc-500">
-                      {item.forma_pagamento || "-"} • {formatDataHora(item.data_pagamento)}
-                    </p>
-                  </div>
+        <ListaRanking
+          titulo="Alunos que mais treinam"
+          itens={resumo.top_alunos}
+          label="registro(s)"
+        />
 
-                  <p className="font-black text-green-600 shrink-0">{formatBRL(item.valor)}</p>
+        <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Movimento por horário
+          </h2>
+
+          {resumo.horarios_movimento.length === 0 ? (
+            <p className="text-gray-500">Sem dados.</p>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-[420px] overflow-y-auto pr-2">
+              {resumo.horarios_movimento.map((item) => (
+                <div
+                  key={item.hora}
+                  className="border rounded-xl px-4 py-3 text-center"
+                >
+                  <p className="text-sm text-gray-500">{item.hora}</p>
+                  <p className="text-xl font-black mt-1">{item.total}</p>
                 </div>
               ))}
             </div>
           )}
-        </SectionCard>
-
-        <SectionCard
-          title="Alunos com vencimento em aberto"
-          subtitle="Mensalidades vencidas ou pendentes"
-        >
-          {dados.alunosVencidos.length === 0 ? (
-            <p className="text-sm text-zinc-500">Nenhum aluno vencido no momento.</p>
-          ) : (
-            <div className="space-y-3">
-              {dados.alunosVencidos.map((item, index) => (
-                <div
-                  key={`${item.aluno}-${index}`}
-                  className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-3 flex items-center justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold text-zinc-900 truncate">{item.aluno}</p>
-                    <p className="text-sm text-zinc-500">
-                      Vencimento: {formatData(item.vencimento)}
-                    </p>
-                  </div>
-
-                  <p className="font-black text-yellow-600 shrink-0">{formatBRL(item.valor)}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </SectionCard>
+        </section>
       </div>
-
-      <SectionCard title="Treinos recentes" subtitle="Últimas movimentações registradas">
-        {dados.treinosRecentes.length === 0 ? (
-          <p className="text-sm text-zinc-500">Nenhum treino recente.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {dados.treinosRecentes.map((item, index) => (
-              <div
-                key={index}
-                className="rounded-2xl border border-black/5 bg-zinc-50 px-4 py-4"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center">
-                    <Clock3 size={18} />
-                  </div>
-
-                  <div>
-                    <p className="font-semibold text-zinc-900">{item.aluno}</p>
-                    <p className="text-sm text-zinc-500 mt-1">{item.horario}</p>
-                    <p className="text-sm text-zinc-600 mt-1">Treino {item.dia}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </SectionCard>
     </div>
   );
 }
