@@ -233,7 +233,6 @@ function SistemaPageContent() {
         />
         <CardResumo
           titulo="Segurança"
-          value=""
           valor="Ativa"
           subtitulo="Controle de senha e permissões"
           icon={LockKeyhole}
