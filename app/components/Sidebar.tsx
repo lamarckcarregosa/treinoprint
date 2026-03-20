@@ -93,20 +93,76 @@ export default function Sidebar() {
 
   const menuBase: MenuItem[] = [
     { href: "/", label: "Início", icon: House },
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, permissao: "dashboard" },
-    { href: "/imprimir", label: "Imprimir", icon: Printer, permissao: "imprimir" },
-    { href: "/pagamentos", label: "Pagamentos", icon: CreditCard, permissao: "pagamentos" },
-    { href: "/alunos", label: "Alunos", icon: Users, permissao: "alunos" },
-    { href: "/personals", label: "Personais", icon: UserSquare2, permissao: "personais" },
-    { href: "/treinos", label: "Treinos", icon: Dumbbell, permissao: "treinos" },
-    { href: "/financeiro", label: "Financeiro", icon: Landmark, permissao: "financeiro" },
-    { href: "/sistema", label: "Sistema", icon: Settings2, permissao: "sistema" },
-    { href: "/avaliacoes", label: "Avaliações", icon: ActivitySquare, permissao: "imprimir" }
+    {
+      href: "/dashboard",
+      label: "Dashboard",
+      icon: LayoutDashboard,
+      permissao: "dashboard",
+    },
+    {
+      href: "/imprimir",
+      label: "Imprimir",
+      icon: Printer,
+      permissao: "imprimir",
+    },
+    {
+      href: "/pagamentos",
+      label: "Pagamentos",
+      icon: CreditCard,
+      permissao: "pagamentos",
+    },
+    {
+      href: "/alunos",
+      label: "Alunos",
+      icon: Users,
+      permissao: "alunos",
+    },
+    {
+      href: "/personals",
+      label: "Personais",
+      icon: UserSquare2,
+      permissao: "personais",
+    },
+    {
+      href: "/treinos",
+      label: "Treinos",
+      icon: Dumbbell,
+      permissao: "treinos",
+    },
+    {
+      href: "/financeiro",
+      label: "Financeiro",
+      icon: Landmark,
+      permissao: "financeiro",
+    },
+    {
+      href: "/avaliacoes",
+      label: "Avaliações",
+      icon: ActivitySquare,
+      permissao: "avaliacoes",
+    },
+    {
+      href: "/usuarios/novasenha",
+      label: "Alterar senha",
+      icon: KeyRound,
+      permissao: "alterar_senha",
+    },
+    {
+      href: "/sistema",
+      label: "Sistema",
+      icon: Settings2,
+      permissao: "sistema",
+    },
   ];
 
   const menuComSuperadmin: MenuItem[] = [
     ...menuBase,
-    { href: "/superadmin", label: "Super Admin", icon: ShieldCheck, permissao: "superadmin" },
+    {
+      href: "/superadmin",
+      label: "Super Admin",
+      icon: ShieldCheck,
+      permissao: "superadmin",
+    },
   ];
 
   const menuFiltrado = useMemo(() => {
@@ -148,7 +204,9 @@ export default function Sidebar() {
 
           {expandida ? (
             <>
-              <h1 className="text-2xl font-black leading-none text-center">TreinoPrint</h1>
+              <h1 className="text-2xl font-black leading-none text-center">
+                TreinoPrint
+              </h1>
               <p className="text-sm text-gray-300 text-center">{nome}</p>
               <p className="text-xs text-gray-500 text-center">{academia}</p>
               {tipo === "superadmin" ? (

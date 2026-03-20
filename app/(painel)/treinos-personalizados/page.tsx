@@ -3,6 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
+import {
+  Activity,
+  ArrowLeft,
+  Plus,
+  Search,
+  RefreshCw,
+  Eye,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
 
 type Aluno = {
   id: number;
@@ -29,6 +40,22 @@ function formatDataHora(data?: string | null) {
   const dt = new Date(data);
   if (Number.isNaN(dt.getTime())) return "-";
   return dt.toLocaleString("pt-BR");
+}
+
+function Card({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={`rounded-2xl border border-black/5 bg-white p-4 shadow-sm md:p-6 ${className}`}
+    >
+      {children}
+    </section>
+  );
 }
 
 export default function TreinosPersonalizadosPage() {
@@ -185,22 +212,36 @@ export default function TreinosPersonalizadosPage() {
   }
 
   return (
-    <main className="p-8 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900">
-            Treinos personalizados
-          </h1>
-          <p className="text-gray-500 mt-2">
-            Gerencie os treinos individuais criados para alunos específicos.
-          </p>
+    <main className="space-y-6">
+      <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-r from-black to-zinc-800 p-6 text-white md:p-8">
+        <div className="absolute -right-10 -top-10 h-72 w-72 rounded-full bg-[#7CFC00]/10 blur-3xl" />
+
+        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+             <h1 className="mt-2 text-5xl font-black md:text-4xl">
+              Treinos personalizados
+            </h1>
+            <p className="mt-3 max-w-2xl text-zinc-300">
+              Gerencie os treinos individuais criados para alunos específicos.
+            </p>
+          </div>
+
+          <div className="min-w-[240px] rounded-3xl bg-white/10 px-5 py-4 backdrop-blur">
+            <p className="text-xs text-white/60">Status do sistema</p>
+            <p className="mt-1 text-xl font-black">TreinoPrint Online</p>
+            <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-[#7CFC00]">
+              <Activity size={16} />
+              Operação ativa
+            </div>
+          </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="relative mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <button
             onClick={() => router.back()}
-            className="bg-zinc-700 text-white px-5 py-3 rounded-xl"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-700 px-5 py-3 text-white hover:bg-zinc-600"
           >
+            <ArrowLeft size={18} />
             Voltar
           </button>
 
@@ -213,28 +254,35 @@ export default function TreinosPersonalizadosPage() {
                 await carregarAlunos();
               }
             }}
-            className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl px-4 py-2"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-white hover:bg-violet-700"
           >
+            <Plus size={18} />
             Novo treino
           </button>
         </div>
-      </div>
+      </section>
 
       {erro ? <p className="text-sm text-red-600">{erro}</p> : null}
 
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por aluno, título, objetivo ou personal"
-            className="border rounded-xl p-3"
-          />
+      <Card>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="relative xl:col-span-1">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por aluno, título, objetivo ou personal"
+              className="w-full rounded-xl border p-3 pl-10"
+            />
+          </div>
 
           <select
             value={alunoFiltro}
             onChange={(e) => setAlunoFiltro(e.target.value)}
-            className="border rounded-xl p-3"
+            className="rounded-xl border p-3"
           >
             <option value="">Todos os alunos</option>
             {alunos.map((aluno) => (
@@ -244,7 +292,7 @@ export default function TreinosPersonalizadosPage() {
             ))}
           </select>
 
-          <label className="flex items-center gap-2 border rounded-xl px-3 py-3">
+          <label className="flex items-center gap-2 rounded-xl border px-3 py-3">
             <input
               type="checkbox"
               checked={somenteAtivos}
@@ -255,34 +303,35 @@ export default function TreinosPersonalizadosPage() {
 
           <button
             onClick={carregar}
-            className="bg-zinc-800 text-white rounded-xl px-5 py-3"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-800 px-5 py-3 text-white"
           >
+            <RefreshCw size={16} />
             Atualizar
           </button>
         </div>
-      </section>
+      </Card>
 
       {treinosFiltrados.length === 0 ? (
-        <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-          <p className="text-gray-500">
-            Nenhum treino personalizado encontrado.
-          </p>
-        </section>
+        <Card>
+          <p className="text-gray-500">Nenhum treino personalizado encontrado.</p>
+        </Card>
       ) : (
-        <section className="space-y-3">
-          {treinosFiltrados.map((treino) => (
+        <section className="bg-white rounded-2xl border border-black/5 p-3 
+max-h-[500px] md:max-h-[650px] xl:max-h-[750px] 
+overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-300">
+  {treinosFiltrados.map((treino) => (
             <div
               key={treino.id}
-              className="bg-white rounded-2xl shadow p-5 border border-black/5 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4"
+              className="flex flex-col gap-4 rounded-2xl border border-black/5 bg-white p-5 shadow-sm xl:flex-row xl:items-center xl:justify-between"
             >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <p className="text-lg font-bold text-gray-900">
                     {treino.titulo || "Treino sem título"}
                   </p>
 
                   <span
-                    className={`text-xs px-3 py-1 rounded-full ${
+                    className={`rounded-full px-3 py-1 text-xs ${
                       treino.ativo
                         ? "bg-green-100 text-green-700"
                         : "bg-gray-100 text-gray-600"
@@ -313,23 +362,25 @@ export default function TreinosPersonalizadosPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <button
                   onClick={() =>
                     router.push(
                       `/alunos/${treino.aluno_id}/treino-personalizado?treino_id=${treino.id}`
                     )
                   }
-                  className="bg-blue-600 text-white px-4 py-2 rounded-xl"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
                 >
+                  <Eye size={16} />
                   Ver / editar
                 </button>
 
                 <button
                   onClick={() => excluirTreino(treino.id)}
                   disabled={excluindoId === treino.id}
-                  className="bg-red-600 text-white px-4 py-2 rounded-xl disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-60"
                 >
+                  <Trash2 size={16} />
                   {excluindoId === treino.id ? "Excluindo..." : "Excluir"}
                 </button>
               </div>
@@ -339,9 +390,9 @@ export default function TreinosPersonalizadosPage() {
       )}
 
       {modalAlunoAberto ? (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 space-y-5">
-            <div className="flex items-center justify-between gap-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-5 shadow-xl md:p-6">
+            <div className="mb-5 flex items-center justify-between gap-3">
               <h2 className="text-2xl font-black text-gray-900">
                 Selecionar aluno
               </h2>
@@ -352,20 +403,27 @@ export default function TreinosPersonalizadosPage() {
                   setModalAlunoAberto(false);
                   setBuscaAluno("");
                 }}
-                className="border rounded-xl px-4 py-2"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2"
               >
+                <X size={16} />
                 Fechar
               </button>
             </div>
 
-            <input
-              value={buscaAluno}
-              onChange={(e) => setBuscaAluno(e.target.value)}
-              placeholder="Buscar por nome, telefone ou CPF"
-              className="w-full border rounded-xl p-3"
-            />
+            <div className="relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                value={buscaAluno}
+                onChange={(e) => setBuscaAluno(e.target.value)}
+                placeholder="Buscar por nome, telefone ou CPF"
+                className="w-full rounded-xl border p-3 pl-10"
+              />
+            </div>
 
-            <div className="border rounded-2xl max-h-[420px] overflow-auto">
+            <div className="mt-4 max-h-[420px] overflow-auto rounded-2xl border">
               {carregandoAlunos ? (
                 <div className="p-4 text-sm text-gray-500">
                   Carregando alunos...
@@ -384,13 +442,21 @@ export default function TreinosPersonalizadosPage() {
                       setBuscaAluno("");
                       router.push(`/alunos/${aluno.id}/treino-personalizado`);
                     }}
-                    className="w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-gray-50"
+                    className="w-full border-b px-4 py-3 text-left hover:bg-gray-50 last:border-b-0"
                   >
-                    <p className="font-semibold text-gray-900">{aluno.nome}</p>
+                    <div className="flex items-start gap-3">
+                      <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100">
+                        <User size={15} className="text-zinc-600" />
+                      </div>
 
-                    <div className="text-xs text-gray-500 mt-1 space-y-1">
-                      {aluno.telefone ? <p>Telefone: {aluno.telefone}</p> : null}
-                      {aluno.cpf ? <p>CPF: {aluno.cpf}</p> : null}
+                      <div>
+                        <p className="font-semibold text-gray-900">{aluno.nome}</p>
+
+                        <div className="mt-1 space-y-1 text-xs text-gray-500">
+                          {aluno.telefone ? <p>Telefone: {aluno.telefone}</p> : null}
+                          {aluno.cpf ? <p>CPF: {aluno.cpf}</p> : null}
+                        </div>
+                      </div>
                     </div>
                   </button>
                 ))

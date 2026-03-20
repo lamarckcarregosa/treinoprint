@@ -2,222 +2,345 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getAcademiaIdFromRequest } from "@/lib/getAcademiaIdFromRequest";
 
-function hojeISO() {
-  return new Date().toISOString().slice(0, 10);
+type RankingItem = {
+  nome: string;
+  total: number;
+};
+
+type SerieCompetencia = {
+  competencia: string;
+  pago: number;
+  aberto: number;
+};
+
+function inicioDoDia(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
-function diaSemanaNome(data: string) {
-  const dias = [
-    "Domingo",
-    "Segunda",
-    "Terça",
-    "Quarta",
-    "Quinta",
-    "Sexta",
-    "Sábado",
-  ];
-  const dt = new Date(data);
-  return dias[dt.getDay()] || "-";
+function formatCompetenciaLabel(date: Date) {
+  const mes = String(date.getMonth() + 1).padStart(2, "0");
+  const ano = date.getFullYear();
+  return `${mes}/${ano}`;
 }
 
-function competenciaLabel(comp?: string | null) {
-  if (!comp) return "-";
-  return comp;
+function buildUltimosMeses(qtd: number, base = new Date()) {
+  const lista: { key: string; label: string }[] = [];
+
+  for (let i = qtd - 1; i >= 0; i--) {
+    const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    lista.push({
+      key,
+      label: formatCompetenciaLabel(d),
+    });
+  }
+
+  return lista;
+}
+
+function diaSemanaPt(dateString: string) {
+  const dias = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const d = new Date(dateString);
+  return dias[d.getDay()] || "-";
+}
+
+function horaLabel(dateString: string) {
+  const d = new Date(dateString);
+  return `${String(d.getHours()).padStart(2, "0")}:00`;
+}
+
+function normalizeNome(valor: unknown, fallback = "Não informado") {
+  if (typeof valor !== "string") return fallback;
+  const v = valor.trim();
+  return v || fallback;
 }
 
 export async function GET(req: NextRequest) {
   try {
     const academiaId = getAcademiaIdFromRequest(req);
-    const hoje = hojeISO();
+
+    if (!academiaId) {
+      return NextResponse.json(
+        { error: "Academia não identificada." },
+        { status: 400 }
+      );
+    }
+
+    const hoje = new Date();
+    const inicioHoje = inicioDoDia(hoje);
 
     const [
       alunosRes,
-      alunosAtivosRes,
-      impressoesHojeRes,
-      treinosPersonalizadosAtivosRes,
+      impressoesRes,
       pagamentosRes,
-      historicoImpressoesRes,
-      catracaRes,
+      acessosRes,
+      treinosRes,
     ] = await Promise.all([
       supabaseServer
         .from("alunos")
-        .select("id, nome, status", { count: "exact" })
+        .select("id, nome, status, created_at")
         .eq("academia_id", academiaId),
 
       supabaseServer
-        .from("alunos")
-        .select("id", { count: "exact", head: true })
-        .eq("academia_id", academiaId)
-        .eq("status", "ativo"),
-
-      supabaseServer
         .from("historico_impressoes")
-        .select("id", { count: "exact", head: true })
-        .eq("academia_id", academiaId)
-        .gte("created_at", `${hoje}T00:00:00`)
-        .lte("created_at", `${hoje}T23:59:59`),
-
-      supabaseServer
-        .from("treinos_personalizados")
-        .select("id", { count: "exact", head: true })
-        .eq("academia_id", academiaId)
-        .eq("ativo", true),
+        .select(`
+          id,
+          academia_id,
+          aluno_id,
+          aluno_nome,
+          personal_nome,
+          created_at,
+          exercicios
+        `)
+        .eq("academia_id", academiaId),
 
       supabaseServer
         .from("financeiro_pagamentos")
-        .select("id, aluno_id, competencia, valor, status, created_at, vencimento")
+        .select(`
+          id,
+          academia_id,
+          aluno_id,
+          competencia,
+          valor,
+          vencimento,
+          data_pagamento,
+          status,
+          created_at
+        `)
         .eq("academia_id", academiaId),
 
       supabaseServer
-        .from("historico_impressoes")
-        .select("id, aluno_id, aluno_nome, personal_nome, exercicios, created_at")
-        .eq("academia_id", academiaId)
-        .order("created_at", { ascending: false })
-        .limit(1000),
+        .from("acessos_catraca")
+        .select(`
+          id,
+          academia_id,
+          aluno_id,
+          aluno_nome,
+          status,
+          motivo,
+          origem,
+          created_at
+        `)
+        .eq("academia_id", academiaId),
 
       supabaseServer
-  .from("acessos_catraca")
-  .select("id, created_at, status, aluno_nome")
-  .eq("academia_id", academiaId)
-  .order("created_at", { ascending: false })
-  .limit(1000),
+        .from("treinos_personalizados")
+        .select("id, academia_id, ativo, divisao, created_at")
+        .eq("academia_id", academiaId),
     ]);
 
-    if (alunosRes.error) throw new Error(alunosRes.error.message);
-    if (alunosAtivosRes.error) throw new Error(alunosAtivosRes.error.message);
-    if (impressoesHojeRes.error) throw new Error(impressoesHojeRes.error.message);
-    if (treinosPersonalizadosAtivosRes.error) {
-      throw new Error(treinosPersonalizadosAtivosRes.error.message);
-    }
-    if (pagamentosRes.error) throw new Error(pagamentosRes.error.message);
-    if (historicoImpressoesRes.error) throw new Error(historicoImpressoesRes.error.message);
-    if (catracaRes.error) throw new Error(catracaRes.error.message);
+    if (alunosRes.error) throw alunosRes.error;
+    if (impressoesRes.error) throw impressoesRes.error;
+    if (pagamentosRes.error) throw pagamentosRes.error;
+    if (acessosRes.error) throw acessosRes.error;
+    if (treinosRes.error) throw treinosRes.error;
 
     const alunos = alunosRes.data || [];
+    const impressoes = impressoesRes.data || [];
     const pagamentos = pagamentosRes.data || [];
-    const historico = historicoImpressoesRes.data || [];
-    const catraca = catracaRes.data || [];
+    const acessos = acessosRes.data || [];
+    const treinos = treinosRes.data || [];
 
-    const totalPago = pagamentos
-      .filter((p) => p.status === "pago")
-      .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+    const alunosCadastrados = alunos.length;
 
-    const totalAberto = pagamentos
-      .filter((p) => p.status !== "pago")
-      .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+    const alunosAtivos = alunos.filter(
+      (a) => String(a.status || "").toLowerCase() === "ativo"
+    ).length;
+
+    const treinosImpressosHoje = impressoes.filter(
+      (i) => i.created_at && new Date(i.created_at) >= inicioHoje
+    ).length;
+
+    const treinosPersonalizadosAtivos = treinos.filter(
+      (t) => t.ativo === true
+    ).length;
+
+    const faturamentoPago = pagamentos
+      .filter((p) => String(p.status || "").toLowerCase() === "pago")
+      .reduce((s, p) => s + Number(p.valor || 0), 0);
+
+    const faturamentoEmAberto = pagamentos
+      .filter((p) => String(p.status || "").toLowerCase() !== "pago")
+      .reduce((s, p) => s + Number(p.valor || 0), 0);
+
+    const acessosLiberadosHoje = acessos.filter(
+      (a) =>
+        a.created_at &&
+        new Date(a.created_at) >= inicioHoje &&
+        String(a.status || "").toLowerCase() === "liberado"
+    ).length;
+
+    const divisaoMap = new Map<string, number>();
+
+    treinos.forEach((t: any) => {
+      const divisao = normalizeNome(t.divisao, "Sem divisão");
+      divisaoMap.set(divisao, (divisaoMap.get(divisao) || 0) + 1);
+    });
+
+    const treinosPorDivisao = [...divisaoMap.entries()]
+      .map(([divisao, total]) => ({ divisao, total }))
+      .sort((a, b) => b.total - a.total);
+
+    const seteDias = new Date();
+    seteDias.setDate(seteDias.getDate() - 7);
+
+    const alunosComAcessoRecente = new Set(
+      acessos
+        .filter((a) => a.created_at && new Date(a.created_at) >= seteDias)
+        .map((a) => a.aluno_id)
+        .filter(Boolean)
+    );
+
+    const alunosRisco = alunos.filter(
+      (a) => !alunosComAcessoRecente.has(a.id)
+    ).length;
+
+    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+    const novosAlunosMes = alunos.filter(
+      (a) => a.created_at && new Date(a.created_at) >= inicioMes
+    ).length;
+
+    const frequenciaMedia = Math.round(
+      acessos.filter((a) => a.created_at && new Date(a.created_at) >= seteDias)
+        .length / 7
+    );
+
+    const ticketMedio =
+      alunosAtivos > 0 ? faturamentoPago / alunosAtivos : 0;
+
+    const inadimplentes = pagamentos.filter((p) => {
+      if (String(p.status || "").toLowerCase() === "pago") return false;
+      if (!p.vencimento) return false;
+      return new Date(p.vencimento) < hoje;
+    }).length;
 
     const personalMap = new Map<string, number>();
-    const horaMap = new Map<string, number>();
-    const exercicioMap = new Map<string, number>();
-    const alunoTreinoMap = new Map<string, number>();
-    const diaSemanaMap = new Map<string, number>([
-      ["Segunda", 0],
-      ["Terça", 0],
-      ["Quarta", 0],
-      ["Quinta", 0],
-      ["Sexta", 0],
-      ["Sábado", 0],
-      ["Domingo", 0],
-    ]);
-    const faturamentoCompetenciaMap = new Map<
-      string,
-      { competencia: string; pago: number; aberto: number }
-    >();
 
-    for (const item of historico) {
-      const personal = String(item.personal_nome || "Não informado");
-      personalMap.set(personal, (personalMap.get(personal) || 0) + 1);
+    impressoes.forEach((i) => {
+      const nome = normalizeNome(i.personal_nome, "Sem personal");
+      personalMap.set(nome, (personalMap.get(nome) || 0) + 1);
+    });
 
-      const alunoNome = String(item.aluno_nome || "Aluno");
-      alunoTreinoMap.set(alunoNome, (alunoTreinoMap.get(alunoNome) || 0) + 1);
-
-      const hora = new Date(item.created_at).getHours().toString().padStart(2, "0") + ":00";
-      horaMap.set(hora, (horaMap.get(hora) || 0) + 1);
-
-      const diaSemana = diaSemanaNome(item.created_at);
-      diaSemanaMap.set(diaSemana, (diaSemanaMap.get(diaSemana) || 0) + 1);
-
-      const exercicios = Array.isArray(item.exercicios) ? item.exercicios : [];
-      for (const ex of exercicios) {
-        const nome = String(ex?.nome_exercicio_snapshot || ex?.nome || "").trim();
-        if (!nome) continue;
-        exercicioMap.set(nome, (exercicioMap.get(nome) || 0) + 1);
-      }
-    }
-
-    for (const item of pagamentos) {
-      const comp = competenciaLabel(item.competencia);
-      const atual = faturamentoCompetenciaMap.get(comp) || {
-        competencia: comp,
-        pago: 0,
-        aberto: 0,
-      };
-
-      if (item.status === "pago") {
-        atual.pago += Number(item.valor || 0);
-      } else {
-        atual.aberto += Number(item.valor || 0);
-      }
-
-      faturamentoCompetenciaMap.set(comp, atual);
-    }
-
-    const rankingPersonais = [...personalMap.entries()]
+    const rankingPersonais: RankingItem[] = [...personalMap.entries()]
       .map(([nome, total]) => ({ nome, total }))
       .sort((a, b) => b.total - a.total)
-      .slice(0, 5);
+      .slice(0, 10);
 
-    const horariosMovimento = [...horaMap.entries()]
+    const alunoMap = new Map<string, number>();
+
+    impressoes.forEach((i) => {
+      const nome = normalizeNome(i.aluno_nome, "Aluno");
+      alunoMap.set(nome, (alunoMap.get(nome) || 0) + 1);
+    });
+
+    const topAlunos: RankingItem[] = [...alunoMap.entries()]
+      .map(([nome, total]) => ({ nome, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+
+    const exercicioMap = new Map<string, number>();
+
+    impressoes.forEach((i: any) => {
+      const lista = Array.isArray(i.exercicios) ? i.exercicios : [];
+
+      lista.forEach((ex: any) => {
+        const nome = normalizeNome(ex?.nome || ex?.exercicio, "Exercício");
+        exercicioMap.set(nome, (exercicioMap.get(nome) || 0) + 1);
+      });
+    });
+
+    const topExercicios: RankingItem[] = [...exercicioMap.entries()]
+      .map(([nome, total]) => ({ nome, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+
+    const horariosMap = new Map<string, number>();
+
+    acessos.forEach((a) => {
+      if (!a.created_at) return;
+      const hora = horaLabel(a.created_at);
+      horariosMap.set(hora, (horariosMap.get(hora) || 0) + 1);
+    });
+
+    const horariosMovimento = [...horariosMap.entries()]
       .map(([hora, total]) => ({ hora, total }))
       .sort((a, b) => a.hora.localeCompare(b.hora));
 
-    const topExercicios = [...exercicioMap.entries()]
-      .map(([nome, total]) => ({ nome, total }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10);
+    const diasBase = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const diasMap = new Map<string, number>(diasBase.map((d) => [d, 0]));
 
-    const topAlunos = [...alunoTreinoMap.entries()]
-      .map(([nome, total]) => ({ nome, total }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10);
+    impressoes.forEach((i) => {
+      if (!i.created_at) return;
+      const dia = diaSemanaPt(i.created_at);
+      diasMap.set(dia, (diasMap.get(dia) || 0) + 1);
+    });
 
-    const treinosPorDiaSemana = [...diaSemanaMap.entries()].map(([dia, total]) => ({
+    const treinosPorDiaSemana = diasBase.map((dia) => ({
       dia,
-      total,
+      total: diasMap.get(dia) || 0,
     }));
 
-    const faturamentoPorCompetencia = [...faturamentoCompetenciaMap.values()].sort((a, b) =>
-      a.competencia.localeCompare(b.competencia)
+    const mesesBase = buildUltimosMeses(6, hoje);
+
+    const faturamentoMap = new Map<string, SerieCompetencia>(
+      mesesBase.map((m) => [
+        m.key,
+        {
+          competencia: m.label,
+          pago: 0,
+          aberto: 0,
+        },
+      ])
     );
 
-    const acessosLiberadosHoje = catraca.filter((item) => {
-  const data = new Date(item.created_at).toISOString().slice(0, 10);
-  return data === hoje && item.status === "liberado";
-}).length;
+    pagamentos.forEach((p) => {
+      let key = "";
 
-const alunosFrequenciaMap = new Map<string, number>();
+      const competenciaRaw = String(p.competencia || "").trim();
 
-for (const item of catraca) {
-  if (item.status !== "liberado") continue;
+      if (/^\d{4}-\d{2}$/.test(competenciaRaw)) {
+        key = competenciaRaw;
+      } else if (/^\d{2}\/\d{4}$/.test(competenciaRaw)) {
+        const [mes, ano] = competenciaRaw.split("/");
+        key = `${ano}-${mes}`;
+      } else if (p.created_at) {
+        const d = new Date(p.created_at);
+        key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      }
 
-  const nome = String(item.aluno_nome || "Aluno");
-  alunosFrequenciaMap.set(nome, (alunosFrequenciaMap.get(nome) || 0) + 1);
-}
+      if (!faturamentoMap.has(key)) return;
 
-const topFrequencia = [...alunosFrequenciaMap.entries()]
-  .map(([nome, total]) => ({ nome, total }))
-  .sort((a, b) => b.total - a.total)
-  .slice(0, 10);
+      const valor = Number(p.valor || 0);
+      const status = String(p.status || "").toLowerCase();
+
+      if (status === "pago") {
+        faturamentoMap.get(key)!.pago += valor;
+      } else {
+        faturamentoMap.get(key)!.aberto += valor;
+      }
+    });
+
+    const faturamentoPorCompetencia = mesesBase.map(
+      (m) => faturamentoMap.get(m.key)!
+    );
 
     return NextResponse.json({
       cards: {
-        alunos_cadastrados: alunosRes.count || 0,
-        alunos_ativos: alunosAtivosRes.count || 0,
-        treinos_impressos_hoje: impressoesHojeRes.count || 0,
-        treinos_personalizados_ativos: treinosPersonalizadosAtivosRes.count || 0,
-        faturamento_pago: totalPago,
-        faturamento_em_aberto: totalAberto,
+        alunos_cadastrados: alunosCadastrados,
+        alunos_ativos: alunosAtivos,
+        treinos_impressos_hoje: treinosImpressosHoje,
+        treinos_personalizados_ativos: treinosPersonalizadosAtivos,
+        faturamento_pago: faturamentoPago,
+        faturamento_em_aberto: faturamentoEmAberto,
         acessos_liberados_hoje: acessosLiberadosHoje,
+        inadimplentes,
+        alunos_risco: alunosRisco,
+        novos_alunos_mes: novosAlunosMes,
+        ticket_medio: ticketMedio,
+        frequencia_media: frequenciaMedia,
       },
       ranking_personais: rankingPersonais,
       horarios_movimento: horariosMovimento,
@@ -225,12 +348,14 @@ const topFrequencia = [...alunosFrequenciaMap.entries()]
       top_alunos: topAlunos,
       treinos_por_dia_semana: treinosPorDiaSemana,
       faturamento_por_competencia: faturamentoPorCompetencia,
-      top_frequencia: topFrequencia
+      treinos_por_divisao: treinosPorDivisao,
     });
   } catch (error: any) {
+    console.error("Erro em /api/dashboard/resumo:", error);
+
     return NextResponse.json(
-      { error: error.message || "Erro ao carregar dashboard" },
-      { status: 400 }
+      { error: error?.message || "Erro dashboard" },
+      { status: 500 }
     );
   }
 }

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/apiFetch";
 import SystemLoader from "@/components/SystemLoader";
 import SystemError from "@/components/SystemError";
-import { Activity } from "lucide-react";
+import { Activity, Printer, Search, User, Dumbbell } from "lucide-react";
 
 type Aluno = {
   id: number | string;
@@ -47,6 +47,30 @@ const diasSemana = [
 
 const niveis = ["Iniciante", "Intermediário", "Avançado"];
 const tipos = ["Masculino", "Feminino"];
+
+function Card({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm md:p-6">
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-gray-900 md:text-xl">{title}</h2>
+        {subtitle ? <p className="mt-1 text-sm text-gray-500">{subtitle}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return <label className="text-sm font-semibold text-gray-600">{children}</label>;
+}
 
 export default function ImprimirPage() {
   const [alunos, setAlunos] = useState<Aluno[]>([]);
@@ -469,259 +493,267 @@ export default function ImprimirPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[32px] bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8 overflow-hidden relative">
-        <div className="absolute -right-10 -top-10 w-72 h-72 bg-[#7CFC00]/10 blur-3xl rounded-full" />
+      <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-r from-black to-zinc-800 p-6 text-white md:p-8">
+        <div className="absolute -right-10 -top-10 h-72 w-72 rounded-full bg-[#7CFC00]/10 blur-3xl" />
 
-        <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="text-sm text-zinc-300">Painel principal</p>
-            <h1 className="text-3xl md:text-4xl font-black mt-2">
-              Bem-vindo ao Imprimir
+            <h1 className="mt-1 text-5xl font-black md:text-4x1">
+              Imprimir Treinos
             </h1>
-            <p className="text-zinc-300 mt-3 max-w-2xl">
+            <p className="mt-3 max-w-2xl text-zinc-300">
               Selecione aluno, personal e carregue o treino padrão ou personalizado.
             </p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
-            <p className="text-white/60 text-xs">Status do sistema</p>
-            <p className="text-xl font-black mt-1">TreinoPrint Online</p>
-            <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
+          <div className="min-w-[240px] rounded-3xl bg-white/10 px-5 py-4 backdrop-blur">
+            <p className="text-xs text-white/60">Status do sistema</p>
+            <p className="mt-1 text-xl font-black">TreinoPrint Online</p>
+            <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-[#7CFC00]">
               <Activity size={16} />
-              Operação ativa
+              Sistema online
             </div>
           </div>
         </div>
       </section>
 
-      {erroPagina ? <p className="text-red-600 text-sm">{erroPagina}</p> : null}
+      {erroPagina ? <p className="text-sm text-red-600">{erroPagina}</p> : null}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-6">
-          <section className="bg-white rounded-2xl shadow p-6 grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="md:col-span-2">
-              <label className="text-sm font-semibold text-gray-600">Semana</label>
-              <input
-                value={semana}
-                onChange={(e) => setSemana(e.target.value)}
-                className="w-full border rounded-xl p-3 mt-1"
-                placeholder="2026-03-02"
-              />
-              <p className="text-[11px] text-gray-500 mt-1">
-                Defina a semana do treino padrão a ser buscado
-              </p>
-            </div>
+          <Card
+            title="Configurações da impressão"
+            subtitle="Escolha o aluno, o personal e a origem do treino."
+          >
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <Label>Semana</Label>
+                <input
+                  value={semana}
+                  onChange={(e) => setSemana(e.target.value)}
+                  className="mt-1 w-full rounded-xl border p-3"
+                  placeholder="2026-03-02"
+                />
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Defina a semana do treino padrão a ser buscado
+                </p>
+              </div>
 
-            <div className="md:col-span-2">
-              <label className="text-sm font-semibold text-gray-600">Aluno</label>
+              <div className="md:col-span-2">
+                <Label>Aluno</Label>
 
-              <input
-                value={buscaAluno}
-                onChange={(e) => setBuscaAluno(e.target.value)}
-                placeholder="Buscar aluno..."
-                className="w-full border rounded-xl p-3 mt-1"
-              />
+                <div className="relative mt-1">
+                  <Search
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                  <input
+                    value={buscaAluno}
+                    onChange={(e) => setBuscaAluno(e.target.value)}
+                    placeholder="Buscar aluno..."
+                    className="w-full rounded-xl border p-3 pl-10"
+                  />
+                </div>
 
-              <div className="mt-2 border rounded-xl max-h-44 overflow-auto">
-                {alunosFiltrados.length === 0 ? (
-                  <p className="p-3 text-sm text-gray-500">Nenhum aluno encontrado.</p>
+                <div className="mt-2 max-h-52 overflow-auto rounded-xl border">
+                  {alunosFiltrados.length === 0 ? (
+                    <p className="p-3 text-sm text-gray-500">Nenhum aluno encontrado.</p>
+                  ) : (
+                    alunosFiltrados.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => {
+                          setAlunoSelecionado(a.nome);
+                          setBuscaAluno(a.nome);
+                        }}
+                        className={`flex w-full items-center gap-3 border-b px-3 py-3 text-left last:border-b-0 hover:bg-gray-50 ${
+                          alunoSelecionado === a.nome ? "bg-blue-50 font-semibold" : ""
+                        }`}
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100">
+                          <User size={15} className="text-zinc-600" />
+                        </div>
+                        <span className="text-sm">{a.nome}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <Label>Personal</Label>
+                <select
+                  value={personalSelecionado}
+                  onChange={(e) => setPersonalSelecionado(e.target.value)}
+                  className="mt-1 w-full rounded-xl border p-3"
+                >
+                  <option value="">-- Selecione --</option>
+                  {personals.map((p) => (
+                    <option key={p.id} value={p.nome}>
+                      {p.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-2 border-t pt-4">
+                <Label>Treino personalizado do aluno</Label>
+
+                <select
+                  value={treinoPersonalizadoSelecionado}
+                  onChange={(e) => {
+                    limparContextoTreino();
+                    setTreinoPersonalizadoSelecionado(e.target.value);
+                  }}
+                  className="mt-1 w-full rounded-xl border p-3"
+                >
+                  <option value="">-- Nenhum selecionado --</option>
+                  {treinosPersonalizados.map((treino) => (
+                    <option key={treino.id} value={treino.id}>
+                      {(treino.titulo || "Treino sem título") +
+                        ` • Código: ${treino.codigo_treino || "-"} • Dia: ${treino.dia_semana || "-"}`}
+                    </option>
+                  ))}
+                </select>
+
+                <p className="mt-1 text-[11px] text-gray-500">
+                  {carregandoTreinosPersonalizados
+                    ? "Carregando treinos personalizados..."
+                    : "Selecione um treino personalizado ativo do aluno, se houver."}
+                </p>
+              </div>
+
+              <div>
+                <Label>Dia</Label>
+                <select
+                  value={diaSelecionado}
+                  onChange={(e) => {
+                    setTreinoBanco(null);
+                    setMsgTreino("");
+                    setExercicios([]);
+                    setCodigoTreinoAtual("");
+                    setDiaTreinoAtual("");
+                    setTituloTreino("TREINO PERSONALIZADO");
+                    setDiaSelecionado(e.target.value);
+                  }}
+                  className="mt-1 w-full rounded-xl border p-3"
+                >
+                  {diasSemana.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Label>Nível</Label>
+                <select
+                  value={nivel}
+                  onChange={(e) => {
+                    setTreinoBanco(null);
+                    setMsgTreino("");
+                    setExercicios([]);
+                    setCodigoTreinoAtual("");
+                    setDiaTreinoAtual("");
+                    setTituloTreino("TREINO PERSONALIZADO");
+                    setNivel(e.target.value);
+                  }}
+                  className="mt-1 w-full rounded-xl border p-3"
+                >
+                  {niveis.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <Label>Tipo</Label>
+                <select
+                  value={tipo}
+                  onChange={(e) => {
+                    setTreinoBanco(null);
+                    setMsgTreino("");
+                    setExercicios([]);
+                    setCodigoTreinoAtual("");
+                    setDiaTreinoAtual("");
+                    setTituloTreino("TREINO PERSONALIZADO");
+                    setTipo(e.target.value);
+                  }}
+                  className="mt-1 w-full rounded-xl border p-3"
+                >
+                  {tipos.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-2 flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={carregarModelo}
+                  disabled={carregandoTreino}
+                  className="rounded-xl bg-blue-600 px-4 py-3 text-white hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {carregandoTreino ? "Carregando..." : "Carregar treino padrão"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={carregarTreinoPersonalizado}
+                  disabled={
+                    carregandoTreino ||
+                    !treinoPersonalizadoSelecionado ||
+                    !alunoSelecionadoObj?.id
+                  }
+                  className="rounded-xl bg-violet-600 px-4 py-3 text-white hover:bg-violet-700 disabled:opacity-60"
+                >
+                  {carregandoTreino ? "Carregando..." : "Carregar treino personalizado"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={reimprimirUltimoTreino}
+                  disabled={carregandoUltimo}
+                  className="rounded-xl bg-gray-800 px-4 py-3 text-white hover:bg-black disabled:opacity-60"
+                >
+                  {carregandoUltimo ? "Carregando..." : "Reimprimir último treino"}
+                </button>
+              </div>
+
+              <div className="md:col-span-2">
+                {msgTreino ? (
+                  <span className={`text-xs ${treinoBanco ? "text-green-700" : "text-red-600"}`}>
+                    {msgTreino}
+                  </span>
                 ) : (
-                  alunosFiltrados.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => {
-                        setAlunoSelecionado(a.nome);
-                        setBuscaAluno(a.nome);
-                      }}
-                      className={`w-full text-left px-3 py-2 border-b last:border-b-0 hover:bg-gray-50 ${
-                        alunoSelecionado === a.nome ? "bg-blue-50 font-semibold" : ""
-                      }`}
-                    >
-                      {a.nome}
-                    </button>
-                  ))
+                  <span className="text-xs text-gray-500">
+                    Selecione os filtros e carregue um treino.
+                  </span>
                 )}
               </div>
             </div>
+          </Card>
 
-            <div className="md:col-span-2">
-              <label className="text-sm font-semibold text-gray-600">Personal</label>
-              <select
-                value={personalSelecionado}
-                onChange={(e) => setPersonalSelecionado(e.target.value)}
-                className="w-full border rounded-xl p-3 mt-1"
-              >
-                <option value="">-- Selecione --</option>
-                {personals.map((p) => (
-                  <option key={p.id} value={p.nome}>
-                    {p.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="md:col-span-2 border-t pt-3">
-              <label className="text-sm font-semibold text-gray-600">
-                Treino personalizado do aluno
-              </label>
-
-              <select
-                value={treinoPersonalizadoSelecionado}
-                onChange={(e) => {
-                  limparContextoTreino();
-                  setTreinoPersonalizadoSelecionado(e.target.value);
-                }}
-                className="w-full border rounded-xl p-3 mt-1"
-              >
-                <option value="">-- Nenhum selecionado --</option>
-                {treinosPersonalizados.map((treino) => (
-                  <option key={treino.id} value={treino.id}>
-                    {(treino.titulo || "Treino sem título") +
-                      ` • Código: ${treino.codigo_treino || "-"} • Dia: ${treino.dia_semana || "-"}`}
-                  </option>
-                ))}
-              </select>
-
-              <p className="text-[11px] text-gray-500 mt-1">
-                {carregandoTreinosPersonalizados
-                  ? "Carregando treinos personalizados..."
-                  : "Selecione um treino personalizado ativo do aluno, se houver."}
-              </p>
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold text-gray-600">Dia</label>
-              <select
-                value={diaSelecionado}
-                onChange={(e) => {
-                  setTreinoBanco(null);
-                  setMsgTreino("");
-                  setExercicios([]);
-                  setCodigoTreinoAtual("");
-                  setDiaTreinoAtual("");
-                  setTituloTreino("TREINO PERSONALIZADO");
-                  setDiaSelecionado(e.target.value);
-                }}
-                className="w-full border rounded-xl p-3 mt-1"
-              >
-                {diasSemana.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold text-gray-600">Nível</label>
-              <select
-                value={nivel}
-                onChange={(e) => {
-                  setTreinoBanco(null);
-                  setMsgTreino("");
-                  setExercicios([]);
-                  setCodigoTreinoAtual("");
-                  setDiaTreinoAtual("");
-                  setTituloTreino("TREINO PERSONALIZADO");
-                  setNivel(e.target.value);
-                }}
-                className="w-full border rounded-xl p-3 mt-1"
-              >
-                {niveis.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="text-sm font-semibold text-gray-600">Tipo</label>
-              <select
-                value={tipo}
-                onChange={(e) => {
-                  setTreinoBanco(null);
-                  setMsgTreino("");
-                  setExercicios([]);
-                  setCodigoTreinoAtual("");
-                  setDiaTreinoAtual("");
-                  setTituloTreino("TREINO PERSONALIZADO");
-                  setTipo(e.target.value);
-                }}
-                className="w-full border rounded-xl p-3 mt-1"
-              >
-                {tipos.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="md:col-span-2 flex items-center gap-2 pt-2 flex-wrap">
-              <button
-                type="button"
-                onClick={carregarModelo}
-                disabled={carregandoTreino}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-4 py-2 rounded-xl"
-              >
-                {carregandoTreino ? "Carregando..." : "Carregar treino padrão"}
-              </button>
-
-              <button
-                type="button"
-                onClick={carregarTreinoPersonalizado}
-                disabled={
-                  carregandoTreino ||
-                  !treinoPersonalizadoSelecionado ||
-                  !alunoSelecionadoObj?.id
-                }
-                className="bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white px-4 py-2 rounded-xl"
-              >
-                {carregandoTreino ? "Carregando..." : "Carregar treino personalizado"}
-              </button>
-
-              <button
-                type="button"
-                onClick={reimprimirUltimoTreino}
-                disabled={carregandoUltimo}
-                className="bg-gray-800 hover:bg-black disabled:opacity-60 text-white px-4 py-2 rounded-xl"
-              >
-                {carregandoUltimo ? "Carregando..." : "Reimprimir último treino"}
-              </button>
-
-              <span className="text-xs">
-                {treinoBanco ? (
-                  <span className="text-green-700">Treino encontrado.</span>
-                ) : (
-                  <span className="text-gray-500">Selecione os filtros e carregue um treino.</span>
-                )}
-              </span>
-            </div>
-
-            {msgTreino ? (
-              <div className="md:col-span-2 text-xs mt-2">
-                <span className={treinoBanco ? "text-green-700" : "text-red-600"}>
-                  {msgTreino}
-                </span>
-              </div>
-            ) : null}
-          </section>
-
-          <section className="bg-white rounded-2xl shadow p-6 space-y-3">
-            <h2 className="font-semibold">Exercícios carregados</h2>
-
-            <div className="border rounded-xl">
+          <Card
+            title="Exercícios carregados"
+            subtitle="Confira os exercícios antes da impressão."
+          >
+            <div className="max-h-[420px] overflow-y-auto rounded-xl border">
               {exercicios.length === 0 ? (
                 <p className="p-3 text-sm text-gray-500">Nenhum exercício carregado.</p>
               ) : (
                 exercicios.map((ex, i) => (
-                  <div key={i} className="px-3 py-2 border-b last:border-b-0">
+                  <div key={i} className="border-b px-3 py-3 last:border-b-0">
                     <p className="text-sm font-semibold">
                       {i + 1}. {ex.nome}
                     </p>
-                    <p className="text-xs text-gray-600">
+                    <p className="mt-1 text-xs text-gray-600">
                       Séries: {ex.series || "-"} | Reps: {ex.repeticoes || "-"} | Carga:{" "}
                       {ex.carga || "-"}
                     </p>
@@ -735,115 +767,121 @@ export default function ImprimirPage() {
                 ))
               )}
             </div>
-          </section>
+          </Card>
 
           <button
             onClick={imprimir}
             disabled={exercicios.length === 0 || !alunoSelecionado || !personalSelecionado}
-            className="no-print w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white rounded-2xl p-4 font-semibold"
+            className="no-print inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 p-4 font-semibold text-white hover:bg-green-700 disabled:opacity-60"
           >
+            <Printer size={18} />
             Imprimir treino
           </button>
         </div>
 
-        <div className="bg-white rounded-2xl shadow p-6">
-          <div className="print-area bg-white p-3 mx-auto font-mono text-xs border border-gray-300">
-            <div className="text-center mb-2">
-              {logoAcademia ? (
-                <img
-                  src={logoAcademia}
-                  alt="Logo da academia"
-                  style={{ width: "130px", margin: "0 auto" }}
-                />
-              ) : (
-                <img
-                  src="/logo-cupom.png"
-                  alt="Logo padrão"
-                  style={{ width: "130px", margin: "0 auto" }}
-                />
-              )}
+        <Card
+          title="Pré-visualização"
+          subtitle="Visualização do cupom/treino antes da impressão."
+        >
+          <div className="overflow-x-auto">
+            <div className="mx-auto min-w-[280px] max-w-[380px] border border-gray-300 bg-white p-3 font-mono text-xs">
+              <div className="mb-2 text-center">
+                {logoAcademia ? (
+                  <img
+                    src={logoAcademia}
+                    alt="Logo da academia"
+                    className="mx-auto w-[130px]"
+                  />
+                ) : (
+                  <img
+                    src="/logo-cupom.png"
+                    alt="Logo padrão"
+                    className="mx-auto w-[130px]"
+                  />
+                )}
 
-              <p className="text-sm font-bold mt-2">{nomeAcademia}</p>
-              <p className="text-lg font-bold tracking-widest">
-                {tituloTreino || "TREINO PERSONALIZADO"}
-              </p>
-              <p className="text-[10px] text-gray-500">Sistema TreinoPrint</p>
-            </div>
-
-            <div className="border-t border-dashed my-3" />
-
-            <div className="text-xs space-y-1">
-              <p>
-                <strong>Aluno:</strong> {alunoSelecionado || "_____________"}
-              </p>
-              <p>
-                <strong>Personal:</strong> {personalSelecionado || "_____________"}
-              </p>
-              <p>
-                <strong>Data:</strong> {dataAtual}
-              </p>
-
-              {codigoTreinoAtual ? (
-                <p>
-                  <strong>Código:</strong> {codigoTreinoAtual}
+                <p className="mt-2 text-sm font-bold">{nomeAcademia}</p>
+                <p className="text-lg font-bold tracking-widest">
+                  {tituloTreino || "TREINO PERSONALIZADO"}
                 </p>
-              ) : null}
+                <p className="text-[10px] text-gray-500">Sistema TreinoPrint</p>
+              </div>
 
-              <p>
-                <strong>Treino:</strong> {diaTreinoAtual || diaSelecionado}
-              </p>
+              <div className="my-3 border-t border-dashed" />
 
-              {!codigoTreinoAtual ? (
+              <div className="space-y-1 text-xs">
+                <p>
+                  <strong>Aluno:</strong> {alunoSelecionado || "_____________"}
+                </p>
+                <p>
+                  <strong>Personal:</strong> {personalSelecionado || "_____________"}
+                </p>
+                <p>
+                  <strong>Data:</strong> {dataAtual}
+                </p>
+
+                {codigoTreinoAtual ? (
+                  <p>
+                    <strong>Código:</strong> {codigoTreinoAtual}
+                  </p>
+                ) : null}
+
+                <p>
+                  <strong>Treino:</strong> {diaTreinoAtual || diaSelecionado}
+                </p>
+
+                {!codigoTreinoAtual ? (
+                  <>
+                    <p>
+                      <strong>Nível:</strong> {nivel}
+                    </p>
+                    <p>
+                      <strong>Tipo:</strong> {tipo}
+                    </p>
+                  </>
+                ) : null}
+
+                {objetivoTreino ? (
+                  <p>
+                    <strong>Objetivo:</strong> {objetivoTreino}
+                  </p>
+                ) : null}
+              </div>
+
+              {observacoesTreino ? (
                 <>
-                  <p>
-                    <strong>Nível:</strong> {nivel}
-                  </p>
-                  <p>
-                    <strong>Tipo:</strong> {tipo}
-                  </p>
+                  <div className="my-3 border-t border-dashed" />
+                  <div className="space-y-1 text-xs">
+                    <p className="font-bold">Observações gerais</p>
+                    <p>{observacoesTreino}</p>
+                  </div>
                 </>
               ) : null}
 
-              {objetivoTreino ? (
-                <p>
-                  <strong>Objetivo:</strong> {objetivoTreino}
-                </p>
-              ) : null}
-            </div>
+              <div className="my-3 border-t border-dashed" />
 
-            {observacoesTreino ? (
-              <>
-                <div className="border-t border-dashed my-3" />
-                <div className="text-xs space-y-1">
-                  <p className="font-bold">Observações gerais</p>
-                  <p>{observacoesTreino}</p>
+              {exercicios.map((ex, i) => (
+                <div key={i} className="mb-4 text-xs">
+                  <p className="text-sm font-bold">
+                    {i + 1}. {ex.nome}
+                  </p>
+                  <p>
+                    Séries: {ex.series || "-"} | Reps: {ex.repeticoes || "-"} | Carga:{" "}
+                    {ex.carga || "-"}
+                  </p>
+                  {ex.descanso ? <p>Descanso: {ex.descanso}</p> : null}
+                  {ex.obs ? <p className="text-[11px] italic">Obs: {ex.obs}</p> : null}
+                  <div className="mt-2 border-t border-dashed" />
                 </div>
-              </>
-            ) : null}
+              ))}
 
-            <div className="border-t border-dashed my-3" />
-
-            {exercicios.map((ex, i) => (
-              <div key={i} className="text-xs mb-4">
-                <p className="font-bold text-sm">
-                  {i + 1}. {ex.nome}
-                </p>
-                <p>
-                  Séries: {ex.series || "-"} | Reps: {ex.repeticoes || "-"} | Carga:{" "}
-                  {ex.carga || "-"}
-                </p>
-                {ex.descanso ? <p>Descanso: {ex.descanso}</p> : null}
-                {ex.obs ? <p className="italic text-[11px]">Obs: {ex.obs}</p> : null}
-                <div className="border-t border-dashed mt-2" />
+              <div className="mt-4 space-y-1 text-center text-xs">
+                <p>Horário: {new Date().toLocaleTimeString("pt-BR")}</p>
+                <p className="font-semibold tracking-wider">Bom treino 💪</p>
               </div>
-            ))}
-
-            <div className="text-center text-xs mt-4 space-y-1">
-              <p>Horário: {new Date().toLocaleTimeString("pt-BR")}</p>
-              <p className="font-semibold tracking-wider">Bom treino 💪</p>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

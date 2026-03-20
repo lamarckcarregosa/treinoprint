@@ -1,8 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+  Activity,
+  Wallet,
+  TrendingDown,
+  CircleDollarSign,
+  BadgeDollarSign,
+  Search,
+  Filter,
+  Pencil,
+  Trash2,
+  CheckCircle2,
+  Plus,
+  RefreshCcw,
+  FolderKanban,
+} from "lucide-react";
 import ProtegePagina from "@/components/ProtegePagina";
+import SystemLoader from "@/components/SystemLoader";
+import SystemError from "@/components/SystemError";
 import { apiFetch } from "@/lib/apiFetch";
 
 type Despesa = {
@@ -24,9 +40,68 @@ function formatBRL(valor: number | undefined) {
   });
 }
 
-function DespesasPageContent() {
-  const router = useRouter();
+function formatData(data?: string | null) {
+  if (!data) return "-";
+  const dt = new Date(`${data}T00:00:00`);
+  if (Number.isNaN(dt.getTime())) return data;
+  return dt.toLocaleDateString("pt-BR");
+}
 
+function StatusPill({
+  label,
+  tone = "gray",
+}: {
+  label: string;
+  tone?: "green" | "yellow" | "red" | "blue" | "gray";
+}) {
+  const styles = {
+    green: "bg-green-100 text-green-700",
+    yellow: "bg-yellow-100 text-yellow-700",
+    red: "bg-red-100 text-red-700",
+    blue: "bg-blue-100 text-blue-700",
+    gray: "bg-zinc-100 text-zinc-700",
+  };
+
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${styles[tone]}`}>
+      {label}
+    </span>
+  );
+}
+
+function CardInfo({
+  titulo,
+  valor,
+  cor = "text-gray-900",
+  subtitulo,
+  icon: Icon,
+}: {
+  titulo: string;
+  valor: string;
+  cor?: string;
+  subtitulo?: string;
+  icon?: any;
+}) {
+  return (
+    <div className="bg-white rounded-2xl shadow p-5 border border-black/5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-gray-500">{titulo}</p>
+          <p className={`text-2xl font-black mt-2 ${cor}`}>{valor}</p>
+          {subtitulo ? <p className="text-xs text-gray-400 mt-2">{subtitulo}</p> : null}
+        </div>
+
+        {Icon ? (
+          <div className="w-11 h-11 rounded-2xl bg-zinc-100 flex items-center justify-center text-zinc-700 shrink-0">
+            <Icon size={18} />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function FinanceiroDespesasPageContent() {
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -48,7 +123,7 @@ function DespesasPageContent() {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const [filtroStatus, setFiltroStatus] = useState("todos");
 
-  const carregar = async () => {
+  async function carregar() {
     try {
       setErro("");
 
@@ -67,7 +142,7 @@ function DespesasPageContent() {
     } catch {
       setErro("Erro ao carregar despesas");
     }
-  };
+  }
 
   useEffect(() => {
     const init = async () => {
@@ -82,11 +157,20 @@ function DespesasPageContent() {
     init();
   }, []);
 
+  const limparFormulario = () => {
+    setDescricao("");
+    setCategoria("");
+    setValor("");
+    setDataLancamento("");
+    setObservacoes("");
+    setTipoCadastro("variavel");
+  };
+
   const cadastrarDespesa = async () => {
     try {
       setErro("");
 
-      if (!descricao || !valor || !dataLancamento) {
+      if (!descricao.trim() || !valor || !dataLancamento) {
         setErro("Preencha descrição, valor e data");
         return;
       }
@@ -99,13 +183,12 @@ function DespesasPageContent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          descricao,
-          categoria,
+          descricao: descricao.trim(),
+          categoria: categoria.trim() || null,
           valor: Number(valor),
           data_lancamento: dataLancamento,
-          observacoes,
+          observacoes: observacoes.trim() || null,
           tipo: tipoCadastro,
-          status: "pendente",
         }),
       });
 
@@ -116,13 +199,7 @@ function DespesasPageContent() {
         return;
       }
 
-      setDescricao("");
-      setCategoria("");
-      setValor("");
-      setDataLancamento("");
-      setObservacoes("");
-      setTipoCadastro("variavel");
-
+      limparFormulario();
       await carregar();
     } finally {
       setSalvando(false);
@@ -160,28 +237,9 @@ function DespesasPageContent() {
 
       setDespesaEditandoId(null);
       await carregar();
-      alert("Despesa atualizada com sucesso");
     } finally {
       setSalvandoDespesaId(null);
     }
-  };
-
-  const excluirDespesa = async (id: number) => {
-    const confirmar = confirm("Excluir esta despesa?");
-    if (!confirmar) return;
-
-    const res = await apiFetch(`/api/financeiro/despesas/${id}`, {
-      method: "DELETE",
-    });
-
-    const json = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      alert((json as any).error || "Erro ao excluir despesa");
-      return;
-    }
-
-    await carregar();
   };
 
   const marcarDespesaComoPaga = async (id: number) => {
@@ -205,89 +263,178 @@ function DespesasPageContent() {
     }
   };
 
-  const categorias = useMemo(
-    () =>
-      [...new Set(despesas.map((d) => (d.categoria || "").trim()).filter(Boolean))].sort(),
-    [despesas]
+  const excluirDespesa = async (id: number) => {
+    const confirmar = confirm("Excluir esta despesa?");
+    if (!confirmar) return;
+
+    const res = await apiFetch(`/api/financeiro/despesas/${id}`, {
+      method: "DELETE",
+    });
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      alert((json as any).error || "Erro ao excluir despesa");
+      return;
+    }
+
+    await carregar();
+  };
+
+  const categorias = [
+    ...new Set(
+      despesas
+        .map((item) => (item.categoria || "").trim())
+        .filter(Boolean)
+    ),
+  ];
+
+  const despesasFiltradas = useMemo(() => {
+    return despesas.filter((item) => {
+      const matchTexto =
+        !filtroTexto ||
+        item.descricao.toLowerCase().includes(filtroTexto.toLowerCase()) ||
+        (item.observacoes || "").toLowerCase().includes(filtroTexto.toLowerCase());
+
+      const matchCategoria =
+        !filtroCategoria ||
+        (item.categoria || "").toLowerCase() === filtroCategoria.toLowerCase();
+
+      const matchTipo =
+        filtroTipo === "todos" || (item.tipo || "variavel") === filtroTipo;
+
+      const matchStatus =
+        filtroStatus === "todos" || (item.status || "pendente") === filtroStatus;
+
+      return matchTexto && matchCategoria && matchTipo && matchStatus;
+    });
+  }, [despesas, filtroTexto, filtroCategoria, filtroTipo, filtroStatus]);
+
+  const totalDespesas = despesasFiltradas.reduce(
+    (acc, item) => acc + Number(item.valor || 0),
+    0
   );
 
-  const despesasFiltradas = despesas.filter((item) => {
-    const texto = filtroTexto.toLowerCase();
+  const totalPagas = despesasFiltradas
+    .filter((item) => item.status === "pago")
+    .reduce((acc, item) => acc + Number(item.valor || 0), 0);
 
-    const matchTexto =
-      !texto ||
-      item.descricao.toLowerCase().includes(texto) ||
-      (item.observacoes || "").toLowerCase().includes(texto);
+  const totalPendentes = despesasFiltradas
+    .filter((item) => item.status !== "pago")
+    .reduce((acc, item) => acc + Number(item.valor || 0), 0);
 
-    const matchCategoria =
-      !filtroCategoria ||
-      (item.categoria || "").toLowerCase() === filtroCategoria.toLowerCase();
-
-    const matchTipo =
-      filtroTipo === "todos" || (item.tipo || "variavel") === filtroTipo;
-
-    const matchStatus =
-      filtroStatus === "todos" || (item.status || "pendente") === filtroStatus;
-
-    return matchTexto && matchCategoria && matchTipo && matchStatus;
-  });
+  const qtdPendentes = despesasFiltradas.filter(
+    (item) => item.status !== "pago"
+  ).length;
 
   if (loading) {
-    return <p className="p-6">Carregando despesas...</p>;
+    return (
+      <SystemLoader
+        titulo="TreinoPrint"
+        subtitulo="Carregando despesas..."
+      />
+    );
+  }
+
+  if (erro && despesas.length === 0) {
+    return (
+      <SystemError
+        titulo="Erro ao carregar despesas"
+        mensagem={erro || "Não foi possível carregar a página."}
+        onTentarNovamente={() => window.location.reload()}
+      />
+    );
   }
 
   return (
-    <main className="p-8 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900">Cadastro de despesas</h1>
-          <p className="text-gray-500 mt-2">
-            Cadastre, edite e acompanhe despesas fixas e variáveis da academia
-          </p>
-        </div>
+    <div className="space-y-6">
+      <section className="rounded-[32px] bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8 overflow-hidden relative">
+        <div className="absolute -right-10 -top-10 w-72 h-72 bg-[#7CFC00]/10 blur-3xl rounded-full" />
 
-        <button
-          onClick={() => router.push("/financeiro")}
-          className="bg-black text-white px-5 py-3 rounded-xl hover:bg-gray-800 transition"
-        >
-          Voltar
-        </button>
+        <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-zinc-300">Painel financeiro</p>
+            <h1 className="text-3xl md:text-4xl font-black mt-2">
+              Cadastro de despesas
+            </h1>
+            <p className="text-zinc-300 mt-3 max-w-2xl">
+              Gerencie despesas fixas e variáveis da academia.
+            </p>
+          </div>
+
+          <div className="w-full xl:w-auto xl:min-w-[260px] bg-white/10 backdrop-blur rounded-3xl px-5 py-4 shrink-0">
+            <p className="text-white/60 text-xs">Status do sistema</p>
+            <p className="text-lg md:text-xl font-black mt-1">
+              TreinoPrint Online
+            </p>
+            <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
+              <Activity size={16} />
+              Sistema online
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <CardInfo
+          titulo="Despesas filtradas"
+          valor={formatBRL(totalDespesas)}
+          cor="text-red-600"
+          icon={TrendingDown}
+        />
+        <CardInfo
+          titulo="Total pago"
+          valor={formatBRL(totalPagas)}
+          cor="text-green-600"
+          icon={CircleDollarSign}
+        />
+        <CardInfo
+          titulo="Total pendente"
+          valor={formatBRL(totalPendentes)}
+          cor="text-yellow-600"
+          icon={Wallet}
+        />
+        <CardInfo
+          titulo="Qtd. pendentes"
+          valor={String(qtdPendentes)}
+          subtitulo="Despesas ainda não pagas"
+          icon={BadgeDollarSign}
+        />
       </div>
 
-      <section className="bg-white rounded-2xl shadow p-6 space-y-4 border border-black/5">
-        <h2 className="font-semibold">Cadastrar despesa</h2>
+      <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Plus size={18} className="text-zinc-700" />
+          <h2 className="text-xl font-bold text-gray-900">Nova despesa</h2>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <input
+            placeholder="Descrição"
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
-            placeholder="Descrição"
             className="border rounded-xl p-3"
           />
-
           <input
+            placeholder="Categoria"
             value={categoria}
             onChange={(e) => setCategoria(e.target.value)}
-            placeholder="Categoria"
             className="border rounded-xl p-3"
           />
-
           <input
             type="number"
             step="0.01"
+            placeholder="Valor"
             value={valor}
             onChange={(e) => setValor(e.target.value)}
-            placeholder="Valor"
             className="border rounded-xl p-3"
           />
-
           <input
             type="date"
             value={dataLancamento}
             onChange={(e) => setDataLancamento(e.target.value)}
             className="border rounded-xl p-3"
           />
-
           <select
             value={tipoCadastro}
             onChange={(e) => setTipoCadastro(e.target.value)}
@@ -299,74 +446,105 @@ function DespesasPageContent() {
         </div>
 
         <textarea
+          placeholder="Observações"
           value={observacoes}
           onChange={(e) => setObservacoes(e.target.value)}
-          placeholder="Observações"
           className="border rounded-xl p-3 w-full min-h-24"
         />
 
         {erro ? <p className="text-red-600 text-sm">{erro}</p> : null}
 
-        <button
-          onClick={cadastrarDespesa}
-          disabled={salvando}
-          className="bg-black text-white rounded-xl px-5 py-3 disabled:opacity-60"
-        >
-          {salvando ? "Salvando..." : "Cadastrar despesa"}
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={cadastrarDespesa}
+            disabled={salvando}
+            className="bg-black text-white rounded-xl px-5 py-3 disabled:opacity-60 inline-flex items-center gap-2"
+          >
+            <Plus size={16} />
+            {salvando ? "Salvando..." : "Cadastrar despesa"}
+          </button>
+
+          <button
+            onClick={limparFormulario}
+            className="border rounded-xl px-5 py-3"
+          >
+            Limpar
+          </button>
+        </div>
       </section>
 
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
-          <h2 className="font-semibold">Despesas lançadas</h2>
+      <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-4">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Despesas lançadas</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Filtre e gerencie todas as despesas da academia
+            </p>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 w-full xl:w-auto">
+          <button
+            onClick={carregar}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 hover:bg-zinc-50"
+          >
+            <RefreshCcw size={16} />
+            Atualizar lista
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="relative">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+            />
             <input
               value={filtroTexto}
               onChange={(e) => setFiltroTexto(e.target.value)}
               placeholder="Buscar despesa"
-              className="border rounded-xl p-3"
+              className="border rounded-xl p-3 pl-10 w-full"
             />
-
-            <select
-              value={filtroCategoria}
-              onChange={(e) => setFiltroCategoria(e.target.value)}
-              className="border rounded-xl p-3"
-            >
-              <option value="">Todas categorias</option>
-              {categorias.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              className="border rounded-xl p-3"
-            >
-              <option value="todos">Todos tipos</option>
-              <option value="fixa">Fixa</option>
-              <option value="variavel">Variável</option>
-            </select>
-
-            <select
-              value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value)}
-              className="border rounded-xl p-3"
-            >
-              <option value="todos">Todos status</option>
-              <option value="pendente">Pendente</option>
-              <option value="pago">Paga</option>
-            </select>
           </div>
+
+          <select
+            value={filtroCategoria}
+            onChange={(e) => setFiltroCategoria(e.target.value)}
+            className="border rounded-xl p-3"
+          >
+            <option value="">Todas categorias</option>
+            {categorias.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filtroTipo}
+            onChange={(e) => setFiltroTipo(e.target.value)}
+            className="border rounded-xl p-3"
+          >
+            <option value="todos">Todos tipos</option>
+            <option value="fixa">Fixa</option>
+            <option value="variavel">Variável</option>
+          </select>
+
+          <select
+            value={filtroStatus}
+            onChange={(e) => setFiltroStatus(e.target.value)}
+            className="border rounded-xl p-3"
+          >
+            <option value="todos">Todos status</option>
+            <option value="pago">Pagas</option>
+            <option value="pendente">Pendentes</option>
+          </select>
         </div>
 
         {despesasFiltradas.length === 0 ? (
-          <p className="text-gray-500">Nenhuma despesa encontrada.</p>
+          <div className="rounded-2xl border border-dashed p-8 text-center text-gray-500">
+            Nenhuma despesa encontrada.
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[700px] overflow-y-auto pr-1">
             {despesasFiltradas.map((item) => {
               const editando = despesaEditandoId === item.id;
               const despesaPaga = item.status === "pago";
@@ -375,41 +553,39 @@ function DespesasPageContent() {
                 <div key={item.id} className="border rounded-2xl p-4 space-y-4">
                   {!editando ? (
                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                      <div className="space-y-1">
+                      <div className="space-y-1 min-w-0">
                         <p className="font-bold text-gray-900">{item.descricao}</p>
+
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <StatusPill
+                            label={item.categoria || "Sem categoria"}
+                            tone="blue"
+                          />
+                          <StatusPill
+                            label={item.tipo || "variavel"}
+                            tone="gray"
+                          />
+                          <StatusPill
+                            label={despesaPaga ? "Paga" : "Pendente"}
+                            tone={despesaPaga ? "green" : "yellow"}
+                          />
+                        </div>
+
                         <p className="text-sm text-gray-600">
-                          Categoria: {item.categoria || "-"}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Tipo: {item.tipo || "variavel"}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Data lançamento: {item.data_lancamento || "-"}
+                          Data lançamento: {formatData(item.data_lancamento)}
                         </p>
                         <p className="text-sm text-gray-600">
                           Valor: {formatBRL(item.valor)}
                         </p>
-                        <p className="text-sm">
-                          Status:{" "}
-                          <span
-                            className={
-                              despesaPaga
-                                ? "text-green-600 font-semibold"
-                                : "text-yellow-600 font-semibold"
-                            }
-                          >
-                            {despesaPaga ? "Paga" : "Pendente"}
-                          </span>
-                        </p>
 
                         {item.data_pagamento ? (
                           <p className="text-sm text-green-600">
-                            Pago em: {item.data_pagamento}
+                            Pago em: {formatData(item.data_pagamento)}
                           </p>
                         ) : null}
 
                         {item.observacoes ? (
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-gray-500 break-words">
                             Observações: {item.observacoes}
                           </p>
                         ) : null}
@@ -418,8 +594,9 @@ function DespesasPageContent() {
                       <div className="flex flex-wrap gap-3">
                         <button
                           onClick={() => setDespesaEditandoId(item.id)}
-                          className="bg-black text-white px-4 py-2 rounded-xl"
+                          className="bg-black text-white px-4 py-2 rounded-xl inline-flex items-center gap-2"
                         >
+                          <Pencil size={15} />
                           Editar
                         </button>
 
@@ -427,8 +604,9 @@ function DespesasPageContent() {
                           <button
                             onClick={() => marcarDespesaComoPaga(item.id)}
                             disabled={marcandoPagaId === item.id}
-                            className="bg-green-600 text-white px-4 py-2 rounded-xl disabled:opacity-60"
+                            className="bg-green-600 text-white px-4 py-2 rounded-xl disabled:opacity-60 inline-flex items-center gap-2"
                           >
+                            <CheckCircle2 size={15} />
                             {marcandoPagaId === item.id
                               ? "Marcando..."
                               : "Marcar como paga"}
@@ -437,8 +615,9 @@ function DespesasPageContent() {
 
                         <button
                           onClick={() => excluirDespesa(item.id)}
-                          className="bg-red-600 text-white px-4 py-2 rounded-xl"
+                          className="bg-red-600 text-white px-4 py-2 rounded-xl inline-flex items-center gap-2"
                         >
+                          <Trash2 size={15} />
                           Excluir
                         </button>
                       </div>
@@ -531,14 +710,14 @@ function DespesasPageContent() {
           </div>
         )}
       </section>
-    </main>
+    </div>
   );
 }
 
-export default function DespesasPage() {
+export default function FinanceiroDespesasPage() {
   return (
     <ProtegePagina permissao="financeiro">
-      <DespesasPageContent />
+      <FinanceiroDespesasPageContent />
     </ProtegePagina>
   );
 }

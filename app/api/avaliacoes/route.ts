@@ -1,22 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "../../../lib/supabase-server";
-import { getAcademiaIdFromRequest } from "../../../lib/getAcademiaIdFromRequest";
+import { supabaseServer } from "@/lib/supabase-server";
+import { getAcademiaIdFromRequest } from "@/lib/getAcademiaIdFromRequest";
 
 export async function GET(req: NextRequest) {
   try {
     const academiaId = getAcademiaIdFromRequest(req);
 
-    const { data, error } = await supabaseServer
+    if (!academiaId) {
+      return NextResponse.json(
+        { error: "Academia não identificada" },
+        { status: 400 }
+      );
+    }
+
+    const { data: avaliacoes, error: avaliacoesError } = await supabaseServer
       .from("avaliacoes_fisicas")
-      .select(
-        `
+      .select(`
         id,
         academia_id,
         aluno_id,
         data_avaliacao,
         peso,
         altura,
+        idade,
         percentual_gordura,
+        massa_magra,
+        massa_gorda,
+        taxa_metabolica_basal,
+        agua_corporal,
+        gordura_visceral,
         peito,
         costas,
         cintura,
@@ -25,6 +37,14 @@ export async function GET(req: NextRequest) {
         gluteo,
         braco_esquerdo,
         braco_direito,
+        biceps_esquerdo,
+        biceps_direito,
+        triceps_esquerdo,
+        triceps_direito,
+        antebraco_esquerdo,
+        antebraco_direito,
+        pulso_esquerdo,
+        pulso_direito,
         coxa_esquerda,
         coxa_direita,
         panturrilha_esquerda,
@@ -32,24 +52,48 @@ export async function GET(req: NextRequest) {
         foto_frente,
         foto_lado,
         foto_costas,
-        created_at
-      `
-      )
+        objetivo,
+        observacoes,
+        created_at,
+        updated_at
+      `)
       .eq("academia_id", academiaId)
-      .order("data_avaliacao", { ascending: true });
+      .order("data_avaliacao", { ascending: false });
 
-    if (error) {
-      return NextResponse.json(
-        { error: error.message || "Erro ao buscar avaliações" },
-        { status: 500 }
+    if (avaliacoesError) throw avaliacoesError;
+
+    const alunoIds = Array.from(
+      new Set((avaliacoes || []).map((item) => item.aluno_id).filter(Boolean))
+    );
+
+    let alunosMap = new Map<number, string>();
+
+    if (alunoIds.length > 0) {
+      const { data: alunos, error: alunosError } = await supabaseServer
+        .from("alunos")
+        .select("id, nome")
+        .eq("academia_id", academiaId)
+        .in("id", alunoIds);
+
+      if (alunosError) throw alunosError;
+
+      alunosMap = new Map(
+        (alunos || []).map((aluno) => [Number(aluno.id), aluno.nome || "Aluno"])
       );
     }
 
-    return NextResponse.json(data || []);
+    const lista = (avaliacoes || []).map((item) => ({
+      ...item,
+      aluno_nome: alunosMap.get(Number(item.aluno_id)) || `Aluno #${item.aluno_id}`,
+    }));
+
+    return NextResponse.json(lista);
   } catch (error: any) {
+    console.error("Erro em /api/avaliacoes:", error);
+
     return NextResponse.json(
-      { error: error.message || "Erro ao buscar avaliações" },
-      { status: 400 }
+      { error: error?.message || "Erro ao buscar avaliações" },
+      { status: 500 }
     );
   }
 }
@@ -57,174 +101,71 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const academiaId = getAcademiaIdFromRequest(req);
+
+    if (!academiaId) {
+      return NextResponse.json(
+        { error: "Academia não identificada" },
+        { status: 400 }
+      );
+    }
+
     const body = await req.json();
 
-    const aluno_id = Number(body.aluno_id || 0);
-    const data_avaliacao = String(body.data_avaliacao || "").trim();
-
-    const peso =
-      body.peso !== null &&
-      body.peso !== undefined &&
-      String(body.peso).trim() !== ""
-        ? Number(body.peso)
-        : null;
-
-    const altura =
-      body.altura !== null &&
-      body.altura !== undefined &&
-      String(body.altura).trim() !== ""
-        ? Number(body.altura)
-        : null;
-
-    const percentual_gordura =
-      body.percentual_gordura !== null &&
-      body.percentual_gordura !== undefined &&
-      String(body.percentual_gordura).trim() !== ""
-        ? Number(body.percentual_gordura)
-        : null;
-
-    const peito =
-      body.peito !== null &&
-      body.peito !== undefined &&
-      String(body.peito).trim() !== ""
-        ? Number(body.peito)
-        : null;
-
-    const costas =
-      body.costas !== null &&
-      body.costas !== undefined &&
-      String(body.costas).trim() !== ""
-        ? Number(body.costas)
-        : null;
-
-    const cintura =
-      body.cintura !== null &&
-      body.cintura !== undefined &&
-      String(body.cintura).trim() !== ""
-        ? Number(body.cintura)
-        : null;
-
-    const abdomen =
-      body.abdomen !== null &&
-      body.abdomen !== undefined &&
-      String(body.abdomen).trim() !== ""
-        ? Number(body.abdomen)
-        : null;
-
-    const quadril =
-      body.quadril !== null &&
-      body.quadril !== undefined &&
-      String(body.quadril).trim() !== ""
-        ? Number(body.quadril)
-        : null;
-
-    const gluteo =
-      body.gluteo !== null &&
-      body.gluteo !== undefined &&
-      String(body.gluteo).trim() !== ""
-        ? Number(body.gluteo)
-        : null;
-
-    const braco_esquerdo =
-      body.braco_esquerdo !== null &&
-      body.braco_esquerdo !== undefined &&
-      String(body.braco_esquerdo).trim() !== ""
-        ? Number(body.braco_esquerdo)
-        : null;
-
-    const braco_direito =
-      body.braco_direito !== null &&
-      body.braco_direito !== undefined &&
-      String(body.braco_direito).trim() !== ""
-        ? Number(body.braco_direito)
-        : null;
-
-    const coxa_esquerda =
-      body.coxa_esquerda !== null &&
-      body.coxa_esquerda !== undefined &&
-      String(body.coxa_esquerda).trim() !== ""
-        ? Number(body.coxa_esquerda)
-        : null;
-
-    const coxa_direita =
-      body.coxa_direita !== null &&
-      body.coxa_direita !== undefined &&
-      String(body.coxa_direita).trim() !== ""
-        ? Number(body.coxa_direita)
-        : null;
-
-    const panturrilha_esquerda =
-      body.panturrilha_esquerda !== null &&
-      body.panturrilha_esquerda !== undefined &&
-      String(body.panturrilha_esquerda).trim() !== ""
-        ? Number(body.panturrilha_esquerda)
-        : null;
-
-    const panturrilha_direita =
-      body.panturrilha_direita !== null &&
-      body.panturrilha_direita !== undefined &&
-      String(body.panturrilha_direita).trim() !== ""
-        ? Number(body.panturrilha_direita)
-        : null;
-
-    const foto_frente = String(body.foto_frente || "").trim() || null;
-    const foto_lado = String(body.foto_lado || "").trim() || null;
-    const foto_costas = String(body.foto_costas || "").trim() || null;
-
-    if (!aluno_id) {
-      return NextResponse.json(
-        { error: "Aluno é obrigatório" },
-        { status: 400 }
-      );
-    }
-
-    if (!data_avaliacao) {
-      return NextResponse.json(
-        { error: "Data da avaliação é obrigatória" },
-        { status: 400 }
-      );
-    }
+    const payload = {
+      academia_id: academiaId,
+      aluno_id: body.aluno_id ?? null,
+      data_avaliacao: body.data_avaliacao ?? null,
+      peso: body.peso ?? null,
+      altura: body.altura ?? null,
+      idade: body.idade ?? null,
+      percentual_gordura: body.percentual_gordura ?? null,
+      massa_magra: body.massa_magra ?? null,
+      massa_gorda: body.massa_gorda ?? null,
+      taxa_metabolica_basal: body.taxa_metabolica_basal ?? null,
+      agua_corporal: body.agua_corporal ?? null,
+      gordura_visceral: body.gordura_visceral ?? null,
+      peito: body.peito ?? null,
+      costas: body.costas ?? null,
+      cintura: body.cintura ?? null,
+      abdomen: body.abdomen ?? null,
+      quadril: body.quadril ?? null,
+      gluteo: body.gluteo ?? null,
+      braco_esquerdo: body.braco_esquerdo ?? null,
+      braco_direito: body.braco_direito ?? null,
+      biceps_esquerdo: body.biceps_esquerdo ?? null,
+      biceps_direito: body.biceps_direito ?? null,
+      triceps_esquerdo: body.triceps_esquerdo ?? null,
+      triceps_direito: body.triceps_direito ?? null,
+      antebraco_esquerdo: body.antebraco_esquerdo ?? null,
+      antebraco_direito: body.antebraco_direito ?? null,
+      pulso_esquerdo: body.pulso_esquerdo ?? null,
+      pulso_direito: body.pulso_direito ?? null,
+      coxa_esquerda: body.coxa_esquerda ?? null,
+      coxa_direita: body.coxa_direita ?? null,
+      panturrilha_esquerda: body.panturrilha_esquerda ?? null,
+      panturrilha_direita: body.panturrilha_direita ?? null,
+      foto_frente: body.foto_frente ?? null,
+      foto_lado: body.foto_lado ?? null,
+      foto_costas: body.foto_costas ?? null,
+      objetivo: body.objetivo ?? null,
+      observacoes: body.observacoes ?? null,
+    };
 
     const { data, error } = await supabaseServer
       .from("avaliacoes_fisicas")
-      .insert({
-        academia_id: academiaId,
-        aluno_id,
-        data_avaliacao,
-        peso,
-        altura,
-        percentual_gordura,
-        peito,
-        costas,
-        cintura,
-        abdomen,
-        quadril,
-        gluteo,
-        braco_esquerdo,
-        braco_direito,
-        coxa_esquerda,
-        coxa_direita,
-        panturrilha_esquerda,
-        panturrilha_direita,
-        foto_frente,
-        foto_lado,
-        foto_costas,
-      })
+      .insert(payload)
       .select()
       .single();
 
-    if (error) {
-      return NextResponse.json(
-        { error: error.message || "Erro ao cadastrar avaliação" },
-        { status: 500 }
-      );
-    }
+    if (error) throw error;
 
     return NextResponse.json(data);
   } catch (error: any) {
+    console.error("Erro ao salvar avaliação:", error);
+
     return NextResponse.json(
-      { error: error.message || "Erro ao cadastrar avaliação" },
-      { status: 400 }
+      { error: error?.message || "Erro ao salvar avaliação" },
+      { status: 500 }
     );
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import {
   ResponsiveContainer,
   LineChart,
@@ -12,6 +12,15 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+import {
+  Activity,
+  ArrowLeft,
+  Scale,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  Ruler,
+} from "lucide-react";
 import SystemLoader from "@/components/SystemLoader";
 import SystemError from "@/components/SystemError";
 import MapaCorporal from "@/components/MapaCorporal";
@@ -22,7 +31,9 @@ type Aluno = {
   nome: string;
   objetivo?: string;
   peso_meta?: number | string;
+  sexo?: "masculino" | "feminino" | string | null;
 };
+
 
 type Avaliacao = {
   id: number;
@@ -55,6 +66,20 @@ type Avaliacao = {
 
 function formatData(d: string) {
   return new Date(`${d}T00:00:00`).toLocaleDateString("pt-BR");
+}
+
+function formatKg(v?: number) {
+  return `${Number(v || 0).toFixed(1)} kg`;
+}
+
+function formatCm(v?: number) {
+  return `${Number(v || 0).toFixed(1)} cm`;
+}
+
+function deltaLabel(atual?: number, anterior?: number, sufixo = "") {
+  const delta = Number(((atual || 0) - (anterior || 0)).toFixed(2));
+  const sinal = delta > 0 ? "+" : "";
+  return `${sinal}${delta}${sufixo}`;
 }
 
 function classificarIMC(imc: number) {
@@ -296,7 +321,7 @@ function gerarAnaliseMeta(params: {
       status: "atencao",
       mensagem:
         "Os dados mostram pouca mudança corporal. Isso não é necessariamente ruim, mas vale acompanhar frequência e desempenho.",
-    };
+      };
   }
 
   if (deltaGordura < 0 || deltaCintura < 0 || deltaMassaMagra > 0) {
@@ -317,9 +342,9 @@ function gerarAnaliseMeta(params: {
 }
 
 function corAnalise(status: string) {
-  if (status === "excelente") return "text-green-600 bg-green-50 border-green-200";
-  if (status === "boa") return "text-blue-600 bg-blue-50 border-blue-200";
-  return "text-yellow-700 bg-yellow-50 border-yellow-200";
+  if (status === "excelente") return "border-green-200 bg-green-50 text-green-700";
+  if (status === "boa") return "border-blue-200 bg-blue-50 text-blue-700";
+  return "border-yellow-200 bg-yellow-50 text-yellow-700";
 }
 
 function gerarAnaliseMetaInteligente(params: {
@@ -431,7 +456,7 @@ function gerarAnaliseMetaInteligente(params: {
       status: "atencao",
       mensagem:
         "A redução de gordura ainda não ficou clara nos indicadores atuais.",
-      };
+    };
   }
 
   if (meta === "condicionamento") {
@@ -460,9 +485,35 @@ function gerarAnaliseMetaInteligente(params: {
   };
 }
 
+function StatCard({
+  label,
+  value,
+  helper,
+  accent = "text-black",
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+  accent?: string;
+  icon?: any;
+}) {
+  return (
+    <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-gray-500">{label}</p>
+        {Icon ? <Icon size={18} className={accent} /> : null}
+      </div>
+      <p className={`mt-3 text-3xl font-black ${accent}`}>{value}</p>
+      {helper ? <p className="mt-2 text-sm text-zinc-500">{helper}</p> : null}
+    </div>
+  );
+}
+
 export default function EvolucaoAluno() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const alunoId = params?.id;
 
   const [aluno, setAluno] = useState<Aluno | null>(null);
@@ -521,6 +572,7 @@ export default function EvolucaoAluno() {
         peso: Number(a.peso || 0),
         gordura: Number(a.percentual_gordura || 0),
         massa: Number(a.massa_magra || 0),
+        cintura: Number(a.cintura || 0),
       })),
     [avaliacoes]
   );
@@ -528,14 +580,17 @@ export default function EvolucaoAluno() {
   const pesoInicial = Number(avaliacoes[0]?.peso || 0);
   const pesoAtual = Number(avaliacoes[avaliacoes.length - 1]?.peso || 0);
 
+  const ultima = avaliacoes[avaliacoes.length - 1];
+  const anterior = avaliacoes[avaliacoes.length - 2];
+
   const progressoPeso = pesoInicial
     ? ((pesoInicial - pesoAtual) / pesoInicial) * 100
     : 0;
 
-  const ultima = avaliacoes[avaliacoes.length - 1];
-  const anterior = avaliacoes[avaliacoes.length - 2];
-
-  const sexoAnalise: "masculino" | "feminino" = "masculino";
+  const sexoAnalise: "masculino" | "feminino" =
+  String(aluno?.sexo || "").toLowerCase() === "feminino"
+    ? "feminino"
+    : "masculino";
 
   const imcAtual =
     ultima?.peso && ultima?.altura
@@ -543,20 +598,22 @@ export default function EvolucaoAluno() {
       : 0;
 
   const statusIMC = classificarIMC(imcAtual);
-  const statusGordura = classificarGordura(
-    ultima?.percentual_gordura,
-    sexoAnalise
-  );
-  const statusCintura = classificarCintura(ultima?.cintura, sexoAnalise);
+const statusGordura = classificarGordura(
+  ultima?.percentual_gordura,
+  sexoAnalise
+);
+
+const statusCintura = classificarCintura(ultima?.cintura, sexoAnalise);
 
   const resumoAutomatico = (() => {
     if (!ultima) return "Sem avaliações suficientes para análise.";
-
     return `IMC ${statusIMC.toLowerCase()}, gordura corporal ${statusGordura.toLowerCase()} e cintura com ${statusCintura.toLowerCase()}.`;
   })();
 
   const metaUrl = searchParams.get("meta") || "";
-  const metaAluno = normalizarMeta(aluno?.objetivo || ultima?.objetivo || metaUrl || "geral");
+  const metaAluno = normalizarMeta(
+    aluno?.objetivo || ultima?.objetivo || metaUrl || "geral"
+  );
 
   const analiseMeta = gerarAnaliseMeta({
     meta: metaAluno,
@@ -583,7 +640,6 @@ export default function EvolucaoAluno() {
   });
 
   const pesoMeta = Number(aluno?.peso_meta || 0);
-
   const totalNecessario = pesoInicial && pesoMeta ? pesoInicial - pesoMeta : 0;
   const totalJaEvoluido = pesoInicial && pesoAtual ? pesoInicial - pesoAtual : 0;
 
@@ -615,124 +671,177 @@ export default function EvolucaoAluno() {
   }
 
   return (
-    <main className="space-y-6">
-      <section className="rounded-3xl bg-gradient-to-r from-black to-zinc-800 text-white p-8">
-        <h1 className="text-4xl font-black">Dashboard corporal</h1>
-        <p className="text-zinc-300 mt-2">Evolução física do aluno</p>
-      </section>
-
-      <section className="grid md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl shadow p-5 border border-black/5">
-          <p className="text-sm text-gray-500">Peso inicial</p>
-          <p className="text-2xl font-black">{pesoInicial} kg</p>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow p-5 border border-black/5">
-          <p className="text-sm text-gray-500">Peso atual</p>
-          <p className="text-2xl font-black">{pesoAtual} kg</p>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow p-5 border border-black/5">
-          <p className="text-sm text-gray-500">Progresso geral</p>
-          <p
-            className={`text-2xl font-black ${
-              progressoPeso > 0 ? "text-green-600" : "text-red-600"
-            }`}
-          >
-            {progressoPeso.toFixed(1)}%
-          </p>
-        </div>
-      </section>
-
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+    <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-4 md:px-6 xl:px-8">
+      <section className="overflow-hidden rounded-[32px] bg-gradient-to-r from-black to-zinc-800 p-6 text-white md:p-8">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_0.7fr]">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Meta do aluno</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Acompanhamento do objetivo corporal
+            <button
+              onClick={() => router.back()}
+              className="mb-4 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/90 hover:bg-white/10"
+            >
+              <ArrowLeft size={16} />
+              Voltar
+            </button>
+
+            <p className="text-sm text-zinc-300">Dashboard corporal</p>
+            <h1 className="mt-2 text-3xl font-black md:text-5xl">
+              {aluno?.nome || "Aluno"}
+            </h1>
+            <p className="mt-3 max-w-2xl text-zinc-300">
+              Evolução física, mapa corporal, análise automática e progresso da meta.
+            </p>
+          </div>
+
+          <div className="rounded-[24px] bg-white/10 p-5 backdrop-blur">
+            <p className="text-sm text-white/70">Objetivo atual</p>
+            <p className="mt-1 text-2xl font-black capitalize">
+              {aluno?.objetivo || "Não definido"}
+            </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-white/60">Peso atual</p>
+                <p className="text-xl font-black">{formatKg(pesoAtual)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-white/60">Peso meta</p>
+                <p className="text-xl font-black">
+                  {pesoMeta > 0 ? formatKg(pesoMeta) : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-white/60">Última avaliação</p>
+                <p className="text-base font-bold">
+                  {ultima ? formatData(ultima.data_avaliacao) : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-white/60">Progresso da meta</p>
+                <p className="text-base font-bold">{progressoMeta.toFixed(1)}%</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Peso atual"
+          value={formatKg(pesoAtual)}
+          helper={anterior ? `Variação: ${deltaLabel(ultima?.peso, anterior?.peso, " kg")}` : "Sem comparação anterior"}
+          accent="text-blue-600"
+          icon={Scale}
+        />
+
+        <StatCard
+          label="Gordura corporal"
+          value={`${Number(ultima?.percentual_gordura || 0).toFixed(1)}%`}
+          helper={statusGordura}
+          accent="text-red-600"
+          icon={Activity}
+        />
+
+        <StatCard
+          label="IMC atual"
+          value={String(imcAtual || 0)}
+          helper={statusIMC}
+          accent="text-zinc-900"
+          icon={TrendingUp}
+        />
+
+        <StatCard
+          label="Cintura"
+          value={formatCm(ultima?.cintura)}
+          helper={statusCintura}
+          accent="text-amber-600"
+          icon={Ruler}
+        />
+      </section>
+
+      <section className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Progresso da meta</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Acompanhamento do objetivo corporal do aluno
             </p>
           </div>
 
           <div className="text-left md:text-right">
-            <p className="text-sm text-gray-500">Objetivo</p>
-            <p className="text-lg font-black text-gray-900 capitalize">
-              {aluno?.objetivo || "Não definido"}
+            <p className="text-sm text-gray-500">Meta principal</p>
+            <p className="text-lg font-black capitalize">
+              {aluno?.objetivo || "Não definida"}
             </p>
           </div>
         </div>
 
         {pesoMeta > 0 ? (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="rounded-2xl border border-black/5 p-4">
-                <p className="text-sm text-gray-500">Peso inicial</p>
-                <p className="text-2xl font-black mt-1">{pesoInicial} kg</p>
-              </div>
-
-              <div className="rounded-2xl border border-black/5 p-4">
-                <p className="text-sm text-gray-500">Peso atual</p>
-                <p className="text-2xl font-black mt-1">{pesoAtual} kg</p>
-              </div>
-
-              <div className="rounded-2xl border border-black/5 p-4">
-                <p className="text-sm text-gray-500">Peso meta</p>
-                <p className="text-2xl font-black mt-1">{pesoMeta} kg</p>
-              </div>
-
-              <div className="rounded-2xl border border-black/5 p-4">
-                <p className="text-sm text-gray-500">Falta para meta</p>
-                <p
-                  className={`text-2xl font-black mt-1 ${
-                    faltaParaMeta <= 0 ? "text-green-600" : "text-blue-600"
-                  }`}
-                >
-                  {faltaParaMeta <= 0 ? "Meta atingida" : `${faltaParaMeta} kg`}
-                </p>
-              </div>
+          <div className="mt-5 space-y-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+              <StatCard label="Peso inicial" value={formatKg(pesoInicial)} />
+              <StatCard label="Peso atual" value={formatKg(pesoAtual)} />
+              <StatCard label="Peso meta" value={formatKg(pesoMeta)} accent="text-green-600" icon={Target} />
+              <StatCard
+                label="Falta para meta"
+                value={faltaParaMeta <= 0 ? "Meta atingida" : formatKg(faltaParaMeta)}
+                accent={faltaParaMeta <= 0 ? "text-green-600" : "text-blue-600"}
+                icon={faltaParaMeta <= 0 ? TrendingUp : TrendingDown}
+              />
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-semibold text-gray-700">
-                  Progresso da meta
-                </p>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-700">Progresso total</p>
                 <p className="text-sm font-black text-gray-900">
                   {progressoMeta.toFixed(1)}%
                 </p>
               </div>
 
-              <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-4 w-full overflow-hidden rounded-full bg-gray-200">
                 <div
-                  className={`h-full ${
-                    progressoMeta >= 100 ? "bg-green-600" : "bg-blue-600"
-                  }`}
+                  className={`h-full ${progressoMeta >= 100 ? "bg-green-600" : "bg-blue-600"}`}
                   style={{ width: `${progressoMeta}%` }}
                 />
               </div>
 
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="mt-2 text-xs text-gray-500">
                 {progressoMeta >= 100
                   ? "Parabéns! A meta corporal foi atingida."
                   : "A barra mostra quanto já foi alcançado em direção ao peso meta."}
               </p>
             </div>
-          </>
+          </div>
         ) : (
-          <div className="rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3">
-            <p className="text-yellow-700 text-sm">
+          <div className="mt-5 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3">
+            <p className="text-sm text-yellow-700">
               Defina o peso meta na ficha do aluno para acompanhar o progresso automaticamente.
             </p>
           </div>
         )}
       </section>
 
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-        <h2 className="font-bold mb-4">Evolução corporal</h2>
+      <section className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Evolução corporal</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Peso, gordura, massa magra e cintura ao longo do tempo
+            </p>
+          </div>
+          <div className="text-left md:text-right">
+  <p className="text-sm text-gray-500">Sexo</p>
+  <p className="text-lg font-black text-gray-900 capitalize">
+    {aluno?.sexo || "Não definido"}
+  </p>
+</div>
+        </div>
+        
 
         {grafico.length === 0 ? (
           <p className="text-gray-500">Sem avaliações para este aluno.</p>
         ) : (
-          <div className="h-[350px]">
+          <div className="h-[420px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={grafico}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -740,194 +849,192 @@ export default function EvolucaoAluno() {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Line dataKey="peso" stroke="#2563eb" strokeWidth={3} name="Peso" />
-                <Line dataKey="gordura" stroke="#dc2626" strokeWidth={3} name="% Gordura" />
-                <Line dataKey="massa" stroke="#16a34a" strokeWidth={3} name="Massa magra" />
+                <Line
+                  type="monotone"
+                  dataKey="peso"
+                  stroke="#2563eb"
+                  strokeWidth={3}
+                  name="Peso"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="gordura"
+                  stroke="#dc2626"
+                  strokeWidth={3}
+                  name="% Gordura"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="massa"
+                  stroke="#16a34a"
+                  strokeWidth={3}
+                  name="Massa magra"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="cintura"
+                  stroke="#d97706"
+                  strokeWidth={3}
+                  name="Cintura"
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
         )}
       </section>
 
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-        <h2 className="font-bold mb-4">Mapa corporal</h2>
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-xl font-bold text-gray-900">Mapa corporal</h2>
 
-        {avaliacoes.length === 0 ? (
-          <p className="text-gray-500">Sem avaliações ainda.</p>
-        ) : (
-          <MapaCorporal medidas={avaliacoes[avaliacoes.length - 1]} />
-        )}
-      </section>
-
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <h2 className="font-bold text-lg">Análise corporal automática</h2>
-          <span className="text-sm text-gray-500">
-            Leitura rápida da última avaliação
-          </span>
+          {avaliacoes.length === 0 ? (
+            <p className="text-gray-500">Sem avaliações ainda.</p>
+          ) : (
+            <MapaCorporal
+  medidas={avaliacoes[avaliacoes.length - 1]}
+  sexo={aluno?.sexo === "feminino" ? "feminino" : "masculino"}
+/>
+          )}
         </div>
 
-        {!ultima ? (
-          <p className="text-gray-500">Sem avaliações para análise.</p>
-        ) : (
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="rounded-2xl border border-black/5 p-4">
-                <p className="text-sm text-gray-500">IMC</p>
-                <p className="text-2xl font-black text-gray-900 mt-1">
-                  {imcAtual || 0}
-                </p>
-                <p className={`text-sm font-semibold mt-2 ${corStatus(statusIMC)}`}>
-                  {statusIMC}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-black/5 p-4">
-                <p className="text-sm text-gray-500">Gordura corporal</p>
-                <p className="text-2xl font-black text-gray-900 mt-1">
-                  {ultima.percentual_gordura || 0}%
-                </p>
-                <p className={`text-sm font-semibold mt-2 ${corStatus(statusGordura)}`}>
-                  {statusGordura}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-black/5 p-4">
-                <p className="text-sm text-gray-500">Cintura</p>
-                <p className="text-2xl font-black text-gray-900 mt-1">
-                  {ultima.cintura || 0} cm
-                </p>
-                <p className={`text-sm font-semibold mt-2 ${corStatus(statusCintura)}`}>
-                  {statusCintura}
-                </p>
-              </div>
+        <div className="space-y-6">
+          <section className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <h2 className="text-xl font-bold text-gray-900">
+                Análise corporal automática
+              </h2>
+              <span className="text-sm text-gray-500">
+                Leitura rápida da última avaliação
+              </span>
             </div>
 
-            <div className="rounded-2xl border border-black/5 bg-gray-50 p-4">
-              <p className="text-sm text-gray-500">Resumo automático</p>
-              <p className="text-base font-medium text-gray-900 mt-2">
-                {resumoAutomatico}
-              </p>
-            </div>
-          </div>
-        )}
-      </section>
+            {!ultima ? (
+              <p className="text-gray-500">Sem avaliações para análise.</p>
+            ) : (
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div className="rounded-2xl border border-black/5 p-4">
+                    <p className="text-sm text-gray-500">IMC</p>
+                    <p className="mt-1 text-2xl font-black text-gray-900">
+                      {imcAtual || 0}
+                    </p>
+                    <p className={`mt-2 text-sm font-semibold ${corStatus(statusIMC)}`}>
+                      {statusIMC}
+                    </p>
+                  </div>
 
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <h2 className="font-bold text-lg">Análise por meta</h2>
-          <span className="text-sm text-gray-500 capitalize">
-            Meta atual: {metaAluno}
-          </span>
+                  <div className="rounded-2xl border border-black/5 p-4">
+                    <p className="text-sm text-gray-500">Gordura corporal</p>
+                    <p className="mt-1 text-2xl font-black text-gray-900">
+                      {ultima.percentual_gordura || 0}%
+                    </p>
+                    <p className={`mt-2 text-sm font-semibold ${corStatus(statusGordura)}`}>
+                      {statusGordura}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-black/5 p-4">
+                    <p className="text-sm text-gray-500">Cintura</p>
+                    <p className="mt-1 text-2xl font-black text-gray-900">
+                      {ultima.cintura || 0} cm
+                    </p>
+                    <p className={`mt-2 text-sm font-semibold ${corStatus(statusCintura)}`}>
+                      {statusCintura}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-black/5 bg-gray-50 p-4">
+                  <p className="text-sm text-gray-500">Resumo automático</p>
+                  <p className="mt-2 text-base font-medium text-gray-900">
+                    {resumoAutomatico}
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <h2 className="text-xl font-bold text-gray-900">Análise por meta</h2>
+              <span className="text-sm capitalize text-gray-500">
+                Meta atual: {metaAluno}
+              </span>
+            </div>
+
+            {!ultima ? (
+              <p className="text-gray-500">Sem avaliações para análise por meta.</p>
+            ) : (
+              <div className="space-y-4">
+                <div className={`rounded-2xl border p-4 ${corAnalise(analiseMeta.status)}`}>
+                  <p className="text-sm font-semibold">Diagnóstico</p>
+                  <p className="mt-1 text-xl font-black">{analiseMeta.titulo}</p>
+                  <p className="mt-3 text-sm">{analiseMeta.mensagem}</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                  <div className="rounded-xl border border-black/5 px-4 py-3">
+                    <p className="text-xs text-gray-500">Peso</p>
+                    <p className="font-bold text-gray-900">
+                      {deltaLabel(ultima?.peso, anterior?.peso, " kg")}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-black/5 px-4 py-3">
+                    <p className="text-xs text-gray-500">% Gordura</p>
+                    <p className="font-bold text-gray-900">
+                      {deltaLabel(
+                        ultima?.percentual_gordura,
+                        anterior?.percentual_gordura
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-black/5 px-4 py-3">
+                    <p className="text-xs text-gray-500">Cintura</p>
+                    <p className="font-bold text-gray-900">
+                      {deltaLabel(ultima?.cintura, anterior?.cintura, " cm")}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-black/5 px-4 py-3">
+                    <p className="text-xs text-gray-500">Massa magra</p>
+                    <p className="font-bold text-gray-900">
+                      {deltaLabel(ultima?.massa_magra, anterior?.massa_magra, " kg")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <h2 className="text-xl font-bold text-gray-900">Meta inteligente</h2>
+              <span className="text-sm text-gray-500">
+                Interpretação avançada da meta
+              </span>
+            </div>
+
+            {!ultima ? (
+              <p className="text-gray-500">Sem avaliações para meta inteligente.</p>
+            ) : (
+              <div
+                className={`rounded-2xl border p-4 ${corAnalise(
+                  analiseMetaInteligente.status
+                )}`}
+              >
+                <p className="text-sm font-semibold">Diagnóstico inteligente</p>
+                <p className="mt-1 text-xl font-black">
+                  {analiseMetaInteligente.titulo}
+                </p>
+                <p className="mt-3 text-sm">
+                  {analiseMetaInteligente.mensagem}
+                </p>
+              </div>
+            )}
+          </section>
         </div>
-
-        {!ultima ? (
-          <p className="text-gray-500">Sem avaliações para análise por meta.</p>
-        ) : (
-          <div className="space-y-4">
-            <div className={`rounded-2xl border p-4 ${corAnalise(analiseMeta.status)}`}>
-              <p className="text-sm font-semibold">Diagnóstico</p>
-              <p className="text-xl font-black mt-1">{analiseMeta.titulo}</p>
-              <p className="text-sm mt-3">{analiseMeta.mensagem}</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="rounded-xl border border-black/5 px-4 py-3">
-                <p className="text-xs text-gray-500">Peso</p>
-                <p className="font-bold text-gray-900">
-                  {Number(
-                    ((ultima?.peso || 0) - (anterior?.peso || 0)).toFixed(2)
-                  ) > 0
-                    ? "+"
-                    : ""}
-                  {Number(
-                    ((ultima?.peso || 0) - (anterior?.peso || 0)).toFixed(2)
-                  )}{" "}
-                  kg
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-black/5 px-4 py-3">
-                <p className="text-xs text-gray-500">% Gordura</p>
-                <p className="font-bold text-gray-900">
-                  {Number(
-                    (
-                      (ultima?.percentual_gordura || 0) -
-                      (anterior?.percentual_gordura || 0)
-                    ).toFixed(2)
-                  ) > 0
-                    ? "+"
-                    : ""}
-                  {Number(
-                    (
-                      (ultima?.percentual_gordura || 0) -
-                      (anterior?.percentual_gordura || 0)
-                    ).toFixed(2)
-                  )}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-black/5 px-4 py-3">
-                <p className="text-xs text-gray-500">Cintura</p>
-                <p className="font-bold text-gray-900">
-                  {Number(
-                    ((ultima?.cintura || 0) - (anterior?.cintura || 0)).toFixed(2)
-                  ) > 0
-                    ? "+"
-                    : ""}
-                  {Number(
-                    ((ultima?.cintura || 0) - (anterior?.cintura || 0)).toFixed(2)
-                  )}{" "}
-                  cm
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-black/5 px-4 py-3">
-                <p className="text-xs text-gray-500">Massa magra</p>
-                <p className="font-bold text-gray-900">
-                  {Number(
-                    (
-                      (ultima?.massa_magra || 0) -
-                      (anterior?.massa_magra || 0)
-                    ).toFixed(2)
-                  ) > 0
-                    ? "+"
-                    : ""}
-                  {Number(
-                    (
-                      (ultima?.massa_magra || 0) -
-                      (anterior?.massa_magra || 0)
-                    ).toFixed(2)
-                  )}{" "}
-                  kg
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <h2 className="font-bold text-lg">Meta inteligente</h2>
-          <span className="text-sm text-gray-500 capitalize">
-            Interpretação avançada da meta
-          </span>
-        </div>
-
-        {!ultima ? (
-          <p className="text-gray-500">Sem avaliações para meta inteligente.</p>
-        ) : (
-          <div className={`rounded-2xl border p-4 ${corAnalise(analiseMetaInteligente.status)}`}>
-            <p className="text-sm font-semibold">Diagnóstico inteligente</p>
-            <p className="text-xl font-black mt-1">
-              {analiseMetaInteligente.titulo}
-            </p>
-            <p className="text-sm mt-3">
-              {analiseMetaInteligente.mensagem}
-            </p>
-          </div>
-        )}
       </section>
     </main>
   );

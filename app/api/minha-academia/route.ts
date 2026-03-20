@@ -26,7 +26,12 @@ export async function GET(req: NextRequest) {
           mp_public_key,
           mp_access_token,
           mp_refresh_token,
-          mp_token_expires_at
+          mp_token_expires_at,
+          chave_pix,
+          tipo_chave_pix,
+          nome_recebedor_pix,
+          cidade_pix,
+          descricao_pix
         `
       )
       .eq("id", academiaId)
@@ -57,6 +62,12 @@ export async function PUT(req: NextRequest) {
     const cnpj = String(body.cnpj || "").trim();
     const logo_url = String(body.logo_url || "").trim();
 
+    const chave_pix = String(body.chave_pix || "").trim();
+    const tipo_chave_pix = String(body.tipo_chave_pix || "").trim();
+    const nome_recebedor_pix = String(body.nome_recebedor_pix || "").trim();
+    const cidade_pix = String(body.cidade_pix || "").trim();
+    const descricao_pix = String(body.descricao_pix || "").trim();
+
     const payload: Record<string, any> = {
       nome,
       telefone: telefone || null,
@@ -64,6 +75,11 @@ export async function PUT(req: NextRequest) {
       endereco: endereco || null,
       cnpj: cnpj || null,
       logo_url: logo_url || null,
+      chave_pix: chave_pix || null,
+      tipo_chave_pix: tipo_chave_pix || null,
+      nome_recebedor_pix: nome_recebedor_pix || null,
+      cidade_pix: cidade_pix || null,
+      descricao_pix: descricao_pix || null,
     };
 
     if (!nome) {
@@ -119,7 +135,12 @@ export async function PUT(req: NextRequest) {
           mp_public_key,
           mp_access_token,
           mp_refresh_token,
-          mp_token_expires_at
+          mp_token_expires_at,
+          chave_pix,
+          tipo_chave_pix,
+          nome_recebedor_pix,
+          cidade_pix,
+          descricao_pix
         `
       )
       .single();

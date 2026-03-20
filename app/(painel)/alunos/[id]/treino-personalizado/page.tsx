@@ -3,7 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Trash2,
+  Search,
+  Dumbbell,
+  Plus,
+  Activity,
+  ArrowLeft,
+  Sparkles,
+  Save,
+} from "lucide-react";
 
 type Aluno = {
   id: number;
@@ -337,7 +348,6 @@ function getDivisao(divisao: string) {
         ],
       },
     ],
-
     ab: [
       {
         codigo: "A",
@@ -378,7 +388,6 @@ function getDivisao(divisao: string) {
         ],
       },
     ],
-
     abc: [
       {
         codigo: "A",
@@ -399,7 +408,6 @@ function getDivisao(divisao: string) {
         grupos: ["quadriceps", "posterior", "gluteo", "panturrilha"],
       },
     ],
-
     abcd: [
       {
         codigo: "A",
@@ -426,7 +434,6 @@ function getDivisao(divisao: string) {
         grupos: ["ombro", "posterior", "gluteo", "abdomen"],
       },
     ],
-
     abcde: [
       {
         codigo: "A",
@@ -679,6 +686,30 @@ function gerarTreinosAutomaticosPro(
   }
 
   return treinosGerados;
+}
+
+function Card({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm md:p-6">
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-gray-900 md:text-xl">{title}</h2>
+        {subtitle ? <p className="mt-1 text-sm text-gray-500">{subtitle}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return <label className="mb-1 block text-sm font-medium text-gray-600">{children}</label>;
 }
 
 export default function TreinoPersonalizadoAlunoPage() {
@@ -1291,73 +1322,88 @@ export default function TreinoPersonalizadoAlunoPage() {
   }
 
   return (
-    <main className="p-8 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900">
-            Treinos personalizados do aluno
-          </h1>
-          <p className="text-gray-500 mt-2">
-            {aluno ? `Aluno: ${aluno.nome}` : ""}
-          </p>
-        </div>
+    <main className="space-y-6">
+      <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-r from-black to-zinc-800 p-6 text-white md:p-8">
+  <div className="absolute -right-10 -top-10 h-72 w-72 rounded-full bg-[#7CFC00]/10 blur-3xl" />
 
-        <div className="flex gap-3 flex-wrap">
-          <button
-            onClick={() => router.push("/alunos")}
-            className="bg-zinc-700 text-white px-5 py-3 rounded-xl"
-          >
-            Voltar
-          </button>
+  <div className="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+    <div>
+          <h1 className="mt-2 text-5xl font-black md:text-4xl">
+        Treinos personalizados
+      </h1>
+      <p className="mt-3 max-w-2xl text-zinc-300">
+        {aluno
+          ? `Monte, edite e gerencie os treinos personalizados do aluno: ${aluno.nome}.`
+          : "Monte, edite e gerencie treinos personalizados do aluno."}
+      </p>
+    </div>
 
-          <button
-            onClick={() => limparFormulario()}
-            className="bg-zinc-800 text-white px-5 py-3 rounded-xl"
-          >
-            Novo treino
-          </button>
-
-          <button
-            type="button"
-            onClick={abrirGeradorAutomatico}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2"
-          >
-            Gerar treino automático PRO
-          </button>
-
-          <button
-            onClick={salvar}
-            disabled={salvando}
-            className="bg-black text-white px-5 py-3 rounded-xl disabled:opacity-60"
-          >
-            {salvando
-              ? "Salvando..."
-              : treinoId
-              ? "Salvar alterações"
-              : "Criar treino"}
-          </button>
-        </div>
+    <div className="min-w-[240px] rounded-3xl bg-white/10 px-5 py-4 backdrop-blur">
+      <p className="text-xs text-white/60">Status do sistema</p>
+      <p className="mt-1 text-xl font-black">TreinoPrint Online</p>
+      <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-[#7CFC00]">
+        <Activity size={16} />
+        Operação ativa
       </div>
+    </div>
+  </div>
+
+  <div className="relative mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+    <button
+      onClick={() => router.push("/alunos")}
+      className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-700 px-5 py-3 text-white hover:bg-zinc-600"
+    >
+      <ArrowLeft size={18} />
+      Voltar
+    </button>
+
+    <button
+      onClick={() => limparFormulario()}
+      className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-800 px-5 py-3 text-white hover:bg-zinc-700"
+    >
+      <Plus size={18} />
+      Novo treino
+    </button>
+
+    <button
+      type="button"
+      onClick={abrirGeradorAutomatico}
+      className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-white hover:bg-emerald-700"
+    >
+      <Sparkles size={18} />
+      Gerar treino automático PRO
+    </button>
+
+    <button
+      onClick={salvar}
+      disabled={salvando}
+      className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 font-semibold text-black hover:bg-zinc-100 disabled:opacity-60"
+    >
+      <Save size={18} />
+      {salvando
+        ? "Salvando..."
+        : treinoId
+        ? "Salvar alterações"
+        : "Criar treino"}
+    </button>
+  </div>
+</section>
 
       {erro ? <p className="text-sm text-red-600">{erro}</p> : null}
 
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <h2 className="text-xl font-bold text-gray-900">
-            Treinos já cadastrados
-          </h2>
-
-          <div className="flex flex-wrap gap-2">
+      <Card
+        title="Treinos já cadastrados"
+        subtitle="Gerencie treinos ativos e inativos do aluno."
+      >
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div />
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button
               type="button"
               onClick={() => setMostrarInativos((v) => !v)}
-              className="border rounded-xl px-4 py-2 flex items-center gap-2"
+              className="flex items-center justify-center gap-2 rounded-xl border px-4 py-2"
             >
-              {mostrarInativos ? (
-                <ChevronDown size={16} />
-              ) : (
-                <ChevronRight size={16} />
-              )}
+              {mostrarInativos ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
               {mostrarInativos ? "Ocultar inativos" : "Mostrar inativos"}
             </button>
 
@@ -1365,7 +1411,7 @@ export default function TreinoPersonalizadoAlunoPage() {
               type="button"
               onClick={apagarTreinosInativos}
               disabled={apagandoInativos || treinosInativos.length === 0}
-              className="bg-red-600 text-white rounded-xl px-4 py-2 flex items-center gap-2 disabled:opacity-60"
+              className="flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-white disabled:opacity-60"
             >
               <Trash2 size={16} />
               {apagandoInativos
@@ -1376,17 +1422,13 @@ export default function TreinoPersonalizadoAlunoPage() {
         </div>
 
         {treinosExistentes.length === 0 ? (
-          <p className="text-gray-500">
-            Nenhum treino personalizado cadastrado.
-          </p>
+          <p className="text-gray-500">Nenhum treino personalizado cadastrado.</p>
         ) : (
           <div className="space-y-6">
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-green-700">
-                  Treinos ativos ({treinosAtivos.length})
-                </h3>
-              </div>
+              <h3 className="font-semibold text-green-700">
+                Treinos ativos ({treinosAtivos.length})
+              </h3>
 
               {treinosAtivos.length === 0 ? (
                 <p className="text-sm text-gray-500">Nenhum treino ativo.</p>
@@ -1395,15 +1437,14 @@ export default function TreinoPersonalizadoAlunoPage() {
                   {treinosAtivos.map((treino) => (
                     <div
                       key={treino.id}
-                      className="border border-green-200 bg-green-50/40 rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                      className="flex flex-col gap-3 rounded-2xl border border-green-200 bg-green-50/40 p-4 md:flex-row md:items-center md:justify-between"
                     >
                       <div>
                         <p className="font-semibold text-gray-900">
                           {treino.titulo || "Treino sem título"}
                         </p>
                         <p className="text-sm text-gray-500">
-                          Código: {treino.codigo_treino || "-"} • Dia:{" "}
-                          {treino.dia_semana || "-"}
+                          Código: {treino.codigo_treino || "-"} • Dia: {treino.dia_semana || "-"}
                         </p>
                       </div>
 
@@ -1419,7 +1460,7 @@ export default function TreinoPersonalizadoAlunoPage() {
                             setLoading(false);
                           }
                         }}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-xl"
+                        className="rounded-xl bg-blue-600 px-4 py-2 text-white"
                       >
                         Editar
                       </button>
@@ -1430,29 +1471,26 @@ export default function TreinoPersonalizadoAlunoPage() {
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-zinc-600">
-                  Treinos inativos ({treinosInativos.length})
-                </h3>
-              </div>
+              <h3 className="font-semibold text-zinc-600">
+                Treinos inativos ({treinosInativos.length})
+              </h3>
 
               {mostrarInativos ? (
                 treinosInativos.length === 0 ? (
                   <p className="text-sm text-gray-500">Nenhum treino inativo.</p>
                 ) : (
-                  <div className="grid gap-3 max-h-[360px] overflow-auto pr-1">
+                  <div className="grid max-h-[360px] gap-3 overflow-auto pr-1">
                     {treinosInativos.map((treino) => (
                       <div
                         key={treino.id}
-                        className="border border-zinc-200 bg-zinc-50 rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                        className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:flex-row md:items-center md:justify-between"
                       >
                         <div>
                           <p className="font-semibold text-gray-900">
                             {treino.titulo || "Treino sem título"}
                           </p>
                           <p className="text-sm text-gray-500">
-                            Código: {treino.codigo_treino || "-"} • Dia:{" "}
-                            {treino.dia_semana || "-"}
+                            Código: {treino.codigo_treino || "-"} • Dia: {treino.dia_semana || "-"}
                           </p>
                         </div>
 
@@ -1468,7 +1506,7 @@ export default function TreinoPersonalizadoAlunoPage() {
                               setLoading(false);
                             }
                           }}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-xl"
+                          className="rounded-xl bg-blue-600 px-4 py-2 text-white"
                         >
                           Editar
                         </button>
@@ -1484,25 +1522,24 @@ export default function TreinoPersonalizadoAlunoPage() {
             </div>
           </div>
         )}
-      </section>
+      </Card>
 
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-4">
-        <h2 className="text-xl font-bold text-gray-900">Dados do treino</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Card
+        title="Dados do treino"
+        subtitle="Informações gerais do treino selecionado."
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              Aluno
-            </label>
+            <Label>Aluno</Label>
             <input
               value={aluno?.nome || ""}
               disabled
-              className="border rounded-xl p-3 w-full bg-gray-100"
+              className="w-full rounded-xl border bg-gray-100 p-3"
             />
           </div>
 
-          <div>
-            <label className="flex items-center gap-2 border rounded-xl px-3 py-3 h-[48px] mt-6">
+          <div className="flex items-end">
+            <label className="flex h-[48px] w-full items-center gap-2 rounded-xl border px-3 py-3">
               <input
                 type="checkbox"
                 checked={ativo}
@@ -1513,25 +1550,21 @@ export default function TreinoPersonalizadoAlunoPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              Código do treino
-            </label>
+            <Label>Código do treino</Label>
             <input
               value={codigoTreino}
               onChange={(e) => setCodigoTreino(e.target.value)}
               placeholder="Ex: A"
-              className="border rounded-xl p-3 w-full"
+              className="w-full rounded-xl border p-3"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              Dia da semana
-            </label>
+            <Label>Dia da semana</Label>
             <select
               value={diaSemana}
               onChange={(e) => setDiaSemana(e.target.value)}
-              className="border rounded-xl p-3 w-full"
+              className="w-full rounded-xl border p-3"
             >
               {diasSemana.map((dia) => (
                 <option key={dia} value={dia}>
@@ -1542,116 +1575,109 @@ export default function TreinoPersonalizadoAlunoPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              Título
-            </label>
+            <Label>Título</Label>
             <input
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
               placeholder="Ex: Treino A - Hipertrofia"
-              className="border rounded-xl p-3 w-full"
+              className="w-full rounded-xl border p-3"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              Ordem
-            </label>
+            <Label>Ordem</Label>
             <input
               type="number"
               value={ordemTreino}
               onChange={(e) => setOrdemTreino(e.target.value)}
-              className="border rounded-xl p-3 w-full"
+              className="w-full rounded-xl border p-3"
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              Objetivo
-            </label>
+          <div className="xl:col-span-2">
+            <Label>Objetivo</Label>
             <input
               value={objetivo}
               onChange={(e) => setObjetivo(e.target.value)}
               placeholder="Ex: Ganho de massa"
-              className="border rounded-xl p-3 w-full"
+              className="w-full rounded-xl border p-3"
             />
           </div>
 
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              Observações gerais
-            </label>
+          <div className="md:col-span-2 xl:col-span-3">
+            <Label>Observações gerais</Label>
             <textarea
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
               placeholder="Observações do treino"
-              className="border rounded-xl p-3 w-full min-h-28"
+              className="min-h-28 w-full rounded-xl border p-3"
             />
           </div>
         </div>
-      </section>
+      </Card>
 
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <Card
+        title="Biblioteca de exercícios"
+        subtitle="Busque e adicione exercícios ao treino."
+      >
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-gray-900">
-              Biblioteca de exercícios
-            </h2>
+            <div className="relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                value={buscaExercicio}
+                onChange={(e) => setBuscaExercicio(e.target.value)}
+                placeholder="Buscar exercício por nome, grupo muscular ou categoria"
+                className="w-full rounded-xl border p-3 pl-10"
+              />
+            </div>
           </div>
 
           <button
             onClick={adicionarExercicioManual}
-            className="bg-zinc-800 text-white px-4 py-3 rounded-xl"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 text-white"
           >
+            <Plus size={16} />
             Adicionar exercício manual
           </button>
         </div>
 
-        <input
-          value={buscaExercicio}
-          onChange={(e) => setBuscaExercicio(e.target.value)}
-          placeholder="Buscar exercício por nome, grupo muscular ou categoria"
-          className="border rounded-xl p-3 w-full"
-        />
-
-        <div className="border rounded-2xl max-h-72 overflow-auto">
+        <div className="max-h-72 overflow-auto rounded-2xl border">
           {exerciciosFiltrados.length === 0 ? (
-            <p className="p-4 text-sm text-gray-500">
-              Nenhum exercício encontrado.
-            </p>
+            <p className="p-4 text-sm text-gray-500">Nenhum exercício encontrado.</p>
           ) : (
             exerciciosFiltrados.map((exercicio) => (
               <div
                 key={exercicio.id}
-                className="p-4 border-b last:border-b-0 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                className="flex flex-col gap-3 border-b p-4 last:border-b-0 md:flex-row md:items-center md:justify-between"
               >
-                <div>
-                  <p className="font-semibold text-gray-900">
-                    {exercicio.nome}
-                  </p>
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900">{exercicio.nome}</p>
                   <p className="text-sm text-gray-500">
-                    {exercicio.grupo_muscular || "-"} •{" "}
-                    {exercicio.categoria || "-"}
+                    {exercicio.grupo_muscular || "-"} • {exercicio.categoria || "-"}
                   </p>
                 </div>
 
                 <button
                   onClick={() => adicionarExercicio(exercicio)}
-                  className="bg-black text-white px-4 py-2 rounded-xl"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-black px-4 py-2 text-white"
                 >
+                  <Dumbbell size={15} />
                   Adicionar
                 </button>
               </div>
             ))
           )}
         </div>
-      </section>
+      </Card>
 
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-4">
-        <h2 className="text-xl font-bold text-gray-900">
-          Exercícios do treino
-        </h2>
-
+      <Card
+        title="Exercícios do treino"
+        subtitle="Edite, reordene e personalize os itens do treino."
+      >
         {itens.length === 0 ? (
           <p className="text-gray-500">Nenhum exercício adicionado ainda.</p>
         ) : (
@@ -1659,9 +1685,9 @@ export default function TreinoPersonalizadoAlunoPage() {
             {itens.map((item, index) => (
               <div
                 key={item.local_id}
-                className="border rounded-2xl p-4 space-y-4"
+                className="space-y-4 rounded-2xl border p-4"
               >
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <p className="font-semibold text-gray-900">
                       Exercício #{index + 1}
@@ -1669,35 +1695,33 @@ export default function TreinoPersonalizadoAlunoPage() {
                     <p className="text-sm text-gray-500">Ordem: {item.ordem}</p>
                   </div>
 
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <button
                       onClick={() => moverItem(index, "cima")}
-                      className="border rounded-xl px-3 py-2"
+                      className="rounded-xl border px-3 py-2"
                     >
                       Subir
                     </button>
 
                     <button
                       onClick={() => moverItem(index, "baixo")}
-                      className="border rounded-xl px-3 py-2"
+                      className="rounded-xl border px-3 py-2"
                     >
                       Descer
                     </button>
 
                     <button
                       onClick={() => removerItem(item.local_id)}
-                      className="bg-red-600 text-white rounded-xl px-3 py-2"
+                      className="rounded-xl bg-red-600 px-3 py-2 text-white"
                     >
                       Remover
                     </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="md:col-span-3">
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
-                      Nome do exercício
-                    </label>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="md:col-span-2 xl:col-span-3">
+                    <Label>Nome do exercício</Label>
                     <input
                       value={item.nome_exercicio_snapshot}
                       onChange={(e) =>
@@ -1707,72 +1731,62 @@ export default function TreinoPersonalizadoAlunoPage() {
                           e.target.value
                         )
                       }
-                      className="border rounded-xl p-3 w-full"
+                      className="w-full rounded-xl border p-3"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
-                      Séries
-                    </label>
+                    <Label>Séries</Label>
                     <input
                       value={item.series}
                       onChange={(e) =>
                         atualizarItem(item.local_id, "series", e.target.value)
                       }
-                      className="border rounded-xl p-3 w-full"
+                      className="w-full rounded-xl border p-3"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
-                      Repetições
-                    </label>
+                    <Label>Repetições</Label>
                     <input
                       value={item.repeticoes}
                       onChange={(e) =>
                         atualizarItem(item.local_id, "repeticoes", e.target.value)
                       }
-                      className="border rounded-xl p-3 w-full"
+                      className="w-full rounded-xl border p-3"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
-                      Carga
-                    </label>
+                    <Label>Carga</Label>
                     <input
                       value={item.carga}
                       onChange={(e) =>
                         atualizarItem(item.local_id, "carga", e.target.value)
                       }
-                      className="border rounded-xl p-3 w-full"
+                      className="w-full rounded-xl border p-3"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
-                      Descanso
-                    </label>
+                    <Label>Descanso</Label>
                     <input
                       value={item.descanso}
                       onChange={(e) =>
                         atualizarItem(item.local_id, "descanso", e.target.value)
                       }
-                      className="border rounded-xl p-3 w-full"
+                      className="w-full rounded-xl border p-3"
                     />
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
-                      Observações
-                    </label>
+                    <Label>Observações</Label>
                     <input
                       value={item.observacoes}
                       onChange={(e) =>
                         atualizarItem(item.local_id, "observacoes", e.target.value)
                       }
-                      className="border rounded-xl p-3 w-full"
+                      className="w-full rounded-xl border p-3"
                     />
                   </div>
                 </div>
@@ -1780,12 +1794,12 @@ export default function TreinoPersonalizadoAlunoPage() {
             ))}
           </div>
         )}
-      </section>
+      </Card>
 
       {modalGeradorAberto ? (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 space-y-5">
-            <div className="flex items-center justify-between gap-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-5 shadow-xl md:p-6">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-2xl font-black text-gray-900">
                 Gerar treino automático
               </h2>
@@ -1793,21 +1807,19 @@ export default function TreinoPersonalizadoAlunoPage() {
               <button
                 type="button"
                 onClick={() => setModalGeradorAberto(false)}
-                className="border rounded-xl px-4 py-2"
+                className="rounded-xl border px-4 py-2"
               >
                 Fechar
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">
-                  Objetivo
-                </label>
+                <Label>Objetivo</Label>
                 <select
                   value={geradorObjetivo}
                   onChange={(e) => setGeradorObjetivo(e.target.value)}
-                  className="border rounded-xl p-3 w-full"
+                  className="w-full rounded-xl border p-3"
                 >
                   <option value="hipertrofia">Hipertrofia</option>
                   <option value="emagrecimento">Emagrecimento</option>
@@ -1817,13 +1829,11 @@ export default function TreinoPersonalizadoAlunoPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">
-                  Nível
-                </label>
+                <Label>Nível</Label>
                 <select
                   value={geradorNivel}
                   onChange={(e) => setGeradorNivel(e.target.value)}
-                  className="border rounded-xl p-3 w-full"
+                  className="w-full rounded-xl border p-3"
                 >
                   <option value="iniciante">Iniciante</option>
                   <option value="intermediario">Intermediário</option>
@@ -1832,13 +1842,11 @@ export default function TreinoPersonalizadoAlunoPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">
-                  Frequência semanal
-                </label>
+                <Label>Frequência semanal</Label>
                 <select
                   value={geradorFrequencia}
                   onChange={(e) => setGeradorFrequencia(e.target.value)}
-                  className="border rounded-xl p-3 w-full"
+                  className="w-full rounded-xl border p-3"
                 >
                   <option value="1">1x</option>
                   <option value="2">2x</option>
@@ -1849,13 +1857,11 @@ export default function TreinoPersonalizadoAlunoPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">
-                  Divisão
-                </label>
+                <Label>Divisão</Label>
                 <select
                   value={geradorDivisao}
                   onChange={(e) => setGeradorDivisao(e.target.value)}
-                  className="border rounded-xl p-3 w-full"
+                  className="w-full rounded-xl border p-3"
                 >
                   <option value="fullbody">Full body</option>
                   <option value="ab">AB</option>
@@ -1866,13 +1872,11 @@ export default function TreinoPersonalizadoAlunoPage() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-600 mb-1">
-                  Semana da periodização
-                </label>
+                <Label>Semana da periodização</Label>
                 <select
                   value={geradorSemana}
                   onChange={(e) => setGeradorSemana(e.target.value)}
-                  className="border rounded-xl p-3 w-full"
+                  className="w-full rounded-xl border p-3"
                 >
                   <option value="1">Semana 1 (Adaptação)</option>
                   <option value="2">Semana 2 (Progressão)</option>
@@ -1882,19 +1886,19 @@ export default function TreinoPersonalizadoAlunoPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border bg-zinc-50 p-4 text-sm text-zinc-700">
+            <div className="mt-4 rounded-2xl border bg-zinc-50 p-4 text-sm text-zinc-700">
               O gerador ULTRA PRO usa seleção inteligente da biblioteca, melhor
               distribuição muscular, volume mais equilibrado, menos repetição de
               exercícios e periodização por semana. Os treinos antigos podem ser
               desativados sem exclusão.
             </div>
 
-            <div className="flex gap-3">
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
                 onClick={aplicarGeracaoAutomatica}
                 disabled={gerandoAutomatico}
-                className="flex-1 bg-emerald-600 text-white rounded-xl py-3 disabled:opacity-60"
+                className="flex-1 rounded-xl bg-emerald-600 py-3 text-white disabled:opacity-60"
               >
                 {gerandoAutomatico ? "Gerando..." : "Gerar treino"}
               </button>
@@ -1902,7 +1906,7 @@ export default function TreinoPersonalizadoAlunoPage() {
               <button
                 type="button"
                 onClick={() => setModalGeradorAberto(false)}
-                className="flex-1 border rounded-xl py-3"
+                className="flex-1 rounded-xl border py-3"
               >
                 Cancelar
               </button>

@@ -5,69 +5,103 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Activity,
   ArrowLeft,
+  Camera,
+  ChartColumnBig,
   Printer,
-  User,
-  CalendarDays,
   Scale,
   Ruler,
-  HeartPulse,
+  TrendingUp,
 } from "lucide-react";
-import { apiFetch } from "@/lib/apiFetch";
+import ProtegePagina from "@/components/ProtegePagina";
 import SystemLoader from "@/components/SystemLoader";
 import SystemError from "@/components/SystemError";
-
-type Aluno = {
-  id: number;
-  nome: string;
-  telefone?: string | null;
-  cpf?: string | null;
-  foto_url?: string | null;
-};
+import MapaCorporal from "@/components/MapaCorporal";
+import { apiFetch } from "@/lib/apiFetch";
 
 type Avaliacao = {
   id: number;
   aluno_id: number;
   data_avaliacao: string;
-  peso?: number;
-  altura?: number;
-  idade?: number;
-  percentual_gordura?: number;
-  massa_magra?: number;
-  massa_gorda?: number;
-  taxa_metabolica_basal?: number;
-  agua_corporal?: number;
-  gordura_visceral?: number;
-  peito?: number;
-  costas?: number;
-  cintura?: number;
-  abdomen?: number;
-  quadril?: number;
-  gluteo?: number;
-  braco_esquerdo?: number;
-  braco_direito?: number;
-  coxa_esquerda?: number;
-  coxa_direita?: number;
-  panturrilha_esquerda?: number;
-  panturrilha_direita?: number;
-  foto_frente?: string;
-  foto_lado?: string;
-  foto_costas?: string;
+  peso?: number | null;
+  altura?: number | null;
+  idade?: number | null;
+  percentual_gordura?: number | null;
+  massa_magra?: number | null;
+  massa_gorda?: number | null;
+  taxa_metabolica_basal?: number | null;
+  agua_corporal?: number | null;
+  gordura_visceral?: number | null;
+
+  peito?: number | null;
+  costas?: number | null;
+  cintura?: number | null;
+  abdomen?: number | null;
+  quadril?: number | null;
+  gluteo?: number | null;
+
+  braco_esquerdo?: number | null;
+  braco_direito?: number | null;
+
+  biceps_esquerdo?: number | null;
+  biceps_direito?: number | null;
+  triceps_esquerdo?: number | null;
+  triceps_direito?: number | null;
+  antebraco_esquerdo?: number | null;
+  antebraco_direito?: number | null;
+  pulso_esquerdo?: number | null;
+  pulso_direito?: number | null;
+
+  coxa_esquerda?: number | null;
+  coxa_direita?: number | null;
+  panturrilha_esquerda?: number | null;
+  panturrilha_direita?: number | null;
+
+  foto_frente?: string | null;
+  foto_lado?: string | null;
+  foto_costas?: string | null;
+  objetivo?: string | null;
+  created_at?: string | null;
 };
 
-function formatData(data?: string | null) {
-  if (!data) return "-";
-  const dt = new Date(`${data}T00:00:00`);
-  if (Number.isNaN(dt.getTime())) return data;
-  return dt.toLocaleDateString("pt-BR");
+type Aluno = {
+  id: number;
+  nome: string;
+  sexo?: string | null;
+  objetivo?: string | null;
+  peso_meta?: number | string | null;
+};
+
+function formatData(d?: string | null) {
+  if (!d) return "-";
+  return new Date(`${d}T00:00:00`).toLocaleDateString("pt-BR");
 }
 
-function calcularIMC(peso?: number, altura?: number) {
-  if (!peso || !altura) return 0;
-  return Number((peso / (altura * altura)).toFixed(2));
+function formatNumber(v?: number | null, digits = 1) {
+  if (v === null || v === undefined || Number.isNaN(Number(v))) return "-";
+  return Number(v).toFixed(digits);
+}
+
+function deltaValue(atual?: number | null, anterior?: number | null) {
+  if (atual === null || atual === undefined) return null;
+  if (anterior === null || anterior === undefined) return null;
+  return Number((Number(atual) - Number(anterior)).toFixed(2));
+}
+
+function deltaLabel(atual?: number | null, anterior?: number | null, sufixo = "") {
+  const delta = deltaValue(atual, anterior);
+  if (delta === null) return "-";
+  const sinal = delta > 0 ? "+" : "";
+  return `${sinal}${delta}${sufixo}`;
+}
+
+function deltaColor(delta: number | null, invert = false) {
+  if (delta === null || delta === 0) return "text-zinc-500";
+  if (!invert) return delta > 0 ? "text-green-600" : "text-red-600";
+  return delta < 0 ? "text-green-600" : "text-red-600";
 }
 
 function classificarIMC(imc: number) {
-  if (!imc) return "-";
+  if (!imc) return "Sem dados";
   if (imc < 18.5) return "Abaixo do peso";
   if (imc < 25) return "Peso normal";
   if (imc < 30) return "Sobrepeso";
@@ -76,99 +110,263 @@ function classificarIMC(imc: number) {
   return "Obesidade grau III";
 }
 
-function CardInfo({
-  titulo,
-  valor,
-  subtitulo,
+function classificarGordura(
+  gordura?: number | null,
+  sexo: "masculino" | "feminino" = "masculino"
+) {
+  const g = Number(gordura || 0);
+  if (!g) return "Sem dados";
+
+  if (sexo === "masculino") {
+    if (g < 6) return "Muito baixa";
+    if (g < 14) return "Atlética";
+    if (g < 18) return "Adequada";
+    if (g < 25) return "Elevada";
+    return "Alta";
+  }
+
+  if (g < 14) return "Muito baixa";
+  if (g < 21) return "Atlética";
+  if (g < 25) return "Adequada";
+  if (g < 32) return "Elevada";
+  return "Alta";
+}
+
+function classificarCintura(
+  cintura?: number | null,
+  sexo: "masculino" | "feminino" = "masculino"
+) {
+  const c = Number(cintura || 0);
+  if (!c) return "Sem dados";
+
+  if (sexo === "masculino") {
+    if (c < 94) return "Risco baixo";
+    if (c < 102) return "Risco moderado";
+    return "Risco alto";
+  }
+
+  if (c < 80) return "Risco baixo";
+  if (c < 88) return "Risco moderado";
+  return "Risco alto";
+}
+
+function corStatus(valor: string) {
+  const texto = valor.toLowerCase();
+
+  if (
+    texto.includes("normal") ||
+    texto.includes("adequada") ||
+    texto.includes("baixo") ||
+    texto.includes("atlética")
+  ) {
+    return "text-green-600";
+  }
+
+  if (
+    texto.includes("moderado") ||
+    texto.includes("elevada") ||
+    texto.includes("sobrepeso")
+  ) {
+    return "text-yellow-600";
+  }
+
+  if (
+    texto.includes("alto") ||
+    texto.includes("alta") ||
+    texto.includes("obesidade")
+  ) {
+    return "text-red-600";
+  }
+
+  return "text-gray-600";
+}
+
+function Card({
+  title,
+  subtitle,
+  children,
 }: {
-  titulo: string;
-  valor: string | number;
-  subtitulo?: string;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-      <p className="text-xs text-gray-500">{titulo}</p>
-      <p className="text-xl font-black text-gray-900 mt-1">{valor}</p>
-      {subtitulo ? <p className="text-[11px] text-gray-400 mt-1">{subtitulo}</p> : null}
+    <section className="space-y-4 rounded-2xl border border-black/5 bg-white p-6 shadow-sm">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+        {subtitle ? <p className="mt-1 text-sm text-gray-500">{subtitle}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  helper,
+  accent = "text-black",
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+  accent?: string;
+  icon?: any;
+}) {
+  return (
+    <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-gray-500">{label}</p>
+        {Icon ? <Icon size={18} className={accent} /> : null}
+      </div>
+      <p className={`mt-3 text-3xl font-black ${accent}`}>{value}</p>
+      {helper ? <p className="mt-2 text-sm text-zinc-500">{helper}</p> : null}
     </div>
   );
 }
 
-function LinhaMedida({
-  nome,
-  valor,
+function MedidaLinha({
+  label,
+  atual,
+  anterior,
+  sufixo = " cm",
+  invert = false,
 }: {
-  nome: string;
-  valor?: number;
+  label: string;
+  atual?: number | null;
+  anterior?: number | null;
+  sufixo?: string;
+  invert?: boolean;
 }) {
+  const delta = deltaValue(atual, anterior);
+
   return (
-    <div className="flex items-center justify-between rounded-xl border border-black/5 px-4 py-3">
-      <span className="text-sm text-gray-600">{nome}</span>
-      <span className="font-semibold text-gray-900">{valor || 0}</span>
+    <div className="flex items-center justify-between rounded-xl border px-4 py-3">
+      <div>
+        <p className="text-sm text-gray-500">{label}</p>
+        <p className="font-bold text-gray-900">
+          {atual !== null && atual !== undefined ? `${formatNumber(atual)}${sufixo}` : "-"}
+        </p>
+      </div>
+
+      <div className={`text-sm font-semibold ${deltaColor(delta, invert)}`}>
+        {delta !== null ? deltaLabel(atual, anterior, sufixo) : "-"}
+      </div>
     </div>
   );
 }
 
-export default function AvaliacaoDetalhePage() {
+function FotoCard({ titulo, url }: { titulo: string; url?: string | null }) {
+  return (
+    <div className="space-y-3 rounded-2xl border border-black/5 p-4">
+      <div className="flex items-center gap-2">
+        <Camera size={16} className="text-gray-500" />
+        <p className="text-sm font-semibold text-gray-700">{titulo}</p>
+      </div>
+
+      {url ? (
+        <img
+          src={url}
+          alt={titulo}
+          className="h-72 w-full rounded-xl border object-cover"
+        />
+      ) : (
+        <div className="flex h-72 w-full items-center justify-center rounded-xl border bg-zinc-50 text-zinc-400">
+          Sem foto
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AvaliacaoPageContent() {
   const params = useParams();
   const router = useRouter();
-  const id = params?.id as string;
+  const avaliacaoId = params?.id;
 
   const [avaliacao, setAvaliacao] = useState<Avaliacao | null>(null);
   const [aluno, setAluno] = useState<Aluno | null>(null);
+  const [avaliacaoAnterior, setAvaliacaoAnterior] = useState<Avaliacao | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
 
-  const nomeAcademia =
-    typeof window !== "undefined"
-      ? localStorage.getItem("treinoprint_academia_nome") || "Minha academia"
-      : "Minha academia";
-
-  const logoAcademia =
-    typeof window !== "undefined"
-      ? localStorage.getItem("treinoprint_academia_logo") || ""
-      : "";
-
   useEffect(() => {
-    const carregar = async () => {
+    async function carregar() {
       try {
-        setLoading(true);
         setErro("");
 
-        const resAval = await apiFetch(`/api/avaliacoes/${id}`, {
+        const resAtual = await apiFetch(`/api/avaliacoes/${avaliacaoId}`, {
           cache: "no-store",
         });
-        const jsonAval = await resAval.json().catch(() => ({}));
 
-        if (!resAval.ok) {
-          setErro((jsonAval as any).error || "Erro ao carregar avaliação");
+        const jsonAtual = await resAtual.json().catch(() => ({}));
+
+        if (!resAtual.ok) {
+          setErro((jsonAtual as any).error || "Erro ao carregar avaliação");
           return;
         }
 
-        setAvaliacao(jsonAval);
+        const atual = jsonAtual as Avaliacao;
+        setAvaliacao(atual);
 
-        const resAluno = await apiFetch(`/api/alunos/${jsonAval.aluno_id}`, {
-          cache: "no-store",
-        });
+        const [resAluno, resAvaliacoes] = await Promise.all([
+          apiFetch(`/api/alunos/${atual.aluno_id}`, {
+            cache: "no-store",
+          }),
+          apiFetch(`/api/avaliacoes`, {
+            cache: "no-store",
+          }),
+        ]);
+
         const jsonAluno = await resAluno.json().catch(() => ({}));
+        const jsonAvaliacoes = await resAvaliacoes.json().catch(() => []);
 
         if (resAluno.ok) {
-          setAluno(jsonAluno);
+          setAluno(jsonAluno as Aluno);
+        }
+
+        if (resAvaliacoes.ok) {
+          const lista = (Array.isArray(jsonAvaliacoes) ? jsonAvaliacoes : [])
+            .filter((a: Avaliacao) => String(a.aluno_id) === String(atual.aluno_id))
+            .sort((a: Avaliacao, b: Avaliacao) =>
+              a.data_avaliacao.localeCompare(b.data_avaliacao)
+            );
+
+          const idx = lista.findIndex(
+            (a: Avaliacao) => String(a.id) === String(atual.id)
+          );
+
+          if (idx > 0) {
+            setAvaliacaoAnterior(lista[idx - 1]);
+          }
         }
       } catch {
         setErro("Erro ao carregar avaliação");
       } finally {
         setLoading(false);
       }
-    };
+    }
 
-    if (id) carregar();
-  }, [id]);
+    if (avaliacaoId) carregar();
+  }, [avaliacaoId]);
 
-  const imc = useMemo(
-    () => calcularIMC(avaliacao?.peso, avaliacao?.altura),
-    [avaliacao]
-  );
+  const sexoAnalise: "masculino" | "feminino" =
+  aluno?.sexo === "feminino" ? "feminino" : "masculino";
+
+  const imcAtual =
+    avaliacao?.peso && avaliacao?.altura
+      ? Number((avaliacao.peso / (avaliacao.altura * avaliacao.altura)).toFixed(2))
+      : 0;
+
+  const statusIMC = classificarIMC(imcAtual);
+  const statusGordura = classificarGordura(avaliacao?.percentual_gordura, sexoAnalise);
+  const statusCintura = classificarCintura(avaliacao?.cintura, sexoAnalise);
+
+  const resumoAutomatico = useMemo(() => {
+    if (!avaliacao) return "Sem dados para análise.";
+    return `IMC ${statusIMC.toLowerCase()}, gordura corporal ${statusGordura.toLowerCase()} e cintura com ${statusCintura.toLowerCase()}.`;
+  }, [avaliacao, statusIMC, statusGordura, statusCintura]);
 
   if (loading) {
     return (
@@ -183,291 +381,291 @@ export default function AvaliacaoDetalhePage() {
     return (
       <SystemError
         titulo="Erro ao carregar avaliação"
-        mensagem={erro || "Não foi possível carregar a avaliação."}
+        mensagem={erro || "Avaliação não encontrada"}
         onTentarNovamente={() => window.location.reload()}
       />
     );
   }
 
   return (
-    <main className="space-y-6 print:p-0">
-      <style jsx global>{`
-        @media print {
-          body {
-            background: #fff !important;
-          }
-
-          .no-print {
-            display: none !important;
-          }
-
-          .print-card {
-            box-shadow: none !important;
-            border-color: #d1d5db !important;
-          }
-
-          main {
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-
-          @page {
-            size: A4;
-            margin: 12mm;
-          }
-        }
-      `}</style>
-
-      <section className="no-print rounded-[32px] bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8 overflow-hidden relative">
-        <div className="absolute -right-10 -top-10 w-72 h-72 bg-[#7CFC00]/10 blur-3xl rounded-full" />
-
-        <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+    <main className="mx-auto w-full max-w-[1500px] space-y-6 px-4 py-4 md:px-6 xl:px-8">
+      <section className="overflow-hidden rounded-[32px] bg-gradient-to-r from-black to-zinc-800 p-6 text-white md:p-8">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_0.7fr]">
           <div>
-            <p className="text-sm text-zinc-300">Painel principal</p>
-            <h1 className="text-3xl md:text-4xl font-black mt-2">
-              Detalhe da avaliação
+            <button
+              onClick={() => router.back()}
+              className="mb-4 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/90 hover:bg-white/10"
+            >
+              <ArrowLeft size={16} />
+              Voltar
+            </button>
+
+            <p className="text-sm text-zinc-300">Avaliação física</p>
+            <h1 className="mt-2 text-3xl font-black md:text-5xl">
+              {aluno?.nome || "Aluno"}
             </h1>
-            <p className="text-zinc-300 mt-3 max-w-2xl">
-              Visualização completa da avaliação física do aluno.
+            <p className="mt-3 max-w-2xl text-zinc-300">
+              Visualização da avaliação com composição corporal, fotos e comparação por grupos musculares.
             </p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
-            <p className="text-white/60 text-xs">Status do sistema</p>
-            <p className="text-xl font-black mt-1">TreinoPrint Online</p>
-            <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
-              <Activity size={16} />
-              Operação ativa
+          <div className="rounded-[24px] bg-white/10 p-5 backdrop-blur">
+            <p className="text-sm text-white/70">Data da avaliação</p>
+            <p className="mt-1 text-2xl font-black">
+              {formatData(avaliacao.data_avaliacao)}
+            </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-white/60">Objetivo</p>
+                <p className="text-base font-bold capitalize">
+                  {aluno?.objetivo || avaliacao?.objetivo || "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-white/60">Peso meta</p>
+                <p className="text-base font-bold">
+                  {aluno?.peso_meta ? `${aluno.peso_meta} kg` : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-white/60">Comparação</p>
+                <p className="text-base font-bold">
+                  {avaliacaoAnterior ? "Com avaliação anterior" : "Primeira avaliação"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-white/60">Aluno</p>
+                <p className="text-base font-bold">{aluno?.id || avaliacao.aluno_id}</p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="no-print flex flex-wrap gap-3">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Peso"
+          value={`${formatNumber(avaliacao.peso)} kg`}
+          helper={
+            avaliacaoAnterior
+              ? `Variação: ${deltaLabel(avaliacao.peso, avaliacaoAnterior.peso, " kg")}`
+              : "Primeira avaliação"
+          }
+          accent="text-blue-600"
+          icon={Scale}
+        />
+
+        <StatCard
+          label="% Gordura"
+          value={`${formatNumber(avaliacao.percentual_gordura)}%`}
+          helper={statusGordura}
+          accent="text-red-600"
+          icon={Activity}
+        />
+
+        <StatCard
+          label="IMC"
+          value={String(imcAtual || 0)}
+          helper={statusIMC}
+          accent="text-zinc-900"
+          icon={TrendingUp}
+        />
+
+        <StatCard
+          label="Cintura"
+          value={`${formatNumber(avaliacao.cintura)} cm`}
+          helper={statusCintura}
+          accent="text-amber-600"
+          icon={Ruler}
+        />
+      </section>
+
+      <div className="flex flex-wrap gap-3">
         <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-2 bg-white border border-black/10 rounded-xl px-4 py-3"
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-3 text-white"
         >
-          <ArrowLeft size={16} />
-          Voltar
+          <Printer size={16} />
+          Imprimir
         </button>
 
         <button
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-2 bg-black text-white rounded-xl px-4 py-3"
+          onClick={() => router.push(`/alunos/${avaliacao.aluno_id}/evolucao`)}
+          className="inline-flex items-center gap-2 rounded-xl border px-4 py-3"
         >
-          <Printer size={16} />
-          Imprimir / Salvar PDF
+          <ChartColumnBig size={16} />
+          Dashboard corporal
         </button>
       </div>
 
-      <section className="print-card bg-white rounded-3xl shadow p-6 md:p-8 border border-black/5 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 border-b pb-6">
-          <div className="flex items-center gap-4">
-            {logoAcademia ? (
-              <img
-                src={logoAcademia}
-                alt="Logo academia"
-                className="w-20 h-20 object-contain rounded-2xl border p-2 bg-white"
-              />
-            ) : (
-              <img
-                src="/logo-sistema.png"
-                alt="Logo sistema"
-                className="w-20 h-20 object-contain rounded-2xl border p-2 bg-white"
-              />
-            )}
-
-            <div>
-              <p className="text-sm text-gray-500">Relatório de avaliação física</p>
-              <h2 className="text-2xl font-black text-gray-900">{nomeAcademia}</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Data da avaliação: {formatData(avaliacao.data_avaliacao)}
-              </p>
-            </div>
+      <Card
+        title="Resumo automático"
+        subtitle="Leitura rápida dos principais indicadores."
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-black/5 p-4">
+            <p className="text-sm text-gray-500">IMC</p>
+            <p className="mt-1 text-2xl font-black text-gray-900">{imcAtual || 0}</p>
+            <p className={`mt-2 text-sm font-semibold ${corStatus(statusIMC)}`}>
+              {statusIMC}
+            </p>
           </div>
 
-          <div className="text-left md:text-right">
-            <p className="text-xs text-gray-500">Documento gerado por</p>
-            <p className="font-semibold text-gray-900">TreinoPrint</p>
+          <div className="rounded-2xl border border-black/5 p-4">
+            <p className="text-sm text-gray-500">Gordura corporal</p>
+            <p className="mt-1 text-2xl font-black text-gray-900">
+              {formatNumber(avaliacao.percentual_gordura)}%
+            </p>
+            <p className={`mt-2 text-sm font-semibold ${corStatus(statusGordura)}`}>
+              {statusGordura}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-black/5 p-4">
+            <p className="text-sm text-gray-500">Cintura</p>
+            <p className="mt-1 text-2xl font-black text-gray-900">
+              {formatNumber(avaliacao.cintura)} cm
+            </p>
+            <p className={`mt-2 text-sm font-semibold ${corStatus(statusCintura)}`}>
+              {statusCintura}
+            </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.7fr] gap-6">
-          <section className="space-y-6">
-            <div className="rounded-2xl border border-black/5 p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <User size={18} />
-                <h3 className="font-bold text-lg">Dados do aluno</h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500">Nome</p>
-                  <p className="font-semibold text-gray-900">
-                    {aluno?.nome || `Aluno #${avaliacao.aluno_id}`}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-gray-500">Telefone</p>
-                  <p className="font-semibold text-gray-900">
-                    {aluno?.telefone || "-"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-gray-500">CPF</p>
-                  <p className="font-semibold text-gray-900">
-                    {aluno?.cpf || "-"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-gray-500">Data da avaliação</p>
-                  <p className="font-semibold text-gray-900">
-                    {formatData(avaliacao.data_avaliacao)}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-black/5 p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <HeartPulse size={18} />
-                <h3 className="font-bold text-lg">Indicadores corporais</h3>
-              </div>
-
-             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-  <CardInfo titulo="Peso" valor={`${avaliacao.peso || 0} kg`} />
-  <CardInfo titulo="Altura" valor={`${avaliacao.altura || 0} m`} />
-  <CardInfo titulo="IMC" valor={imc || 0} subtitulo={classificarIMC(imc)} />
-  <CardInfo titulo="% Gordura" valor={avaliacao.percentual_gordura || 0} />
-  <CardInfo titulo="Massa magra" valor={`${avaliacao.massa_magra || 0} kg`} />
-  <CardInfo titulo="Massa gorda" valor={`${avaliacao.massa_gorda || 0} kg`} />
-  <CardInfo titulo="TMB" valor={avaliacao.taxa_metabolica_basal || 0} />
-  <CardInfo titulo="% Água corporal" valor={avaliacao.agua_corporal || 0} />
-</div>
-            </div>
-
-            <div className="rounded-2xl border border-black/5 p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <Ruler size={18} />
-                <h3 className="font-bold text-lg">Medidas corporais</h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-  <LinhaMedida nome="Peito" valor={avaliacao.peito} />
-  <LinhaMedida nome="Costas" valor={avaliacao.costas} />
-  <LinhaMedida nome="Cintura" valor={avaliacao.cintura} />
-  <LinhaMedida nome="Abdômen" valor={avaliacao.abdomen} />
-  <LinhaMedida nome="Quadril" valor={avaliacao.quadril} />
-  <LinhaMedida nome="Glúteo" valor={avaliacao.gluteo} />
-  <LinhaMedida nome="Braço esquerdo" valor={avaliacao.braco_esquerdo} />
-  <LinhaMedida nome="Braço direito" valor={avaliacao.braco_direito} />
-  <LinhaMedida nome="Coxa esquerda" valor={avaliacao.coxa_esquerda} />
-  <LinhaMedida nome="Coxa direita" valor={avaliacao.coxa_direita} />
-  <LinhaMedida nome="Panturrilha esquerda" valor={avaliacao.panturrilha_esquerda} />
-  <LinhaMedida nome="Panturrilha direita" valor={avaliacao.panturrilha_direita} />
-</div>
-            </div>
-          </section>
-
-          <aside className="space-y-6">
-            <div className="rounded-2xl border border-black/5 p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <CalendarDays size={18} />
-                <h3 className="font-bold text-lg">Resumo</h3>
-              </div>
-
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between gap-3">
-                  <span className="text-gray-500">Avaliação</span>
-                  <span className="font-semibold text-gray-900">#{avaliacao.id}</span>
-                </div>
-
-                <div className="flex justify-between gap-3">
-                  <span className="text-gray-500">Aluno ID</span>
-                  <span className="font-semibold text-gray-900">{avaliacao.aluno_id}</span>
-                </div>
-
-                <div className="flex justify-between gap-3">
-                  <span className="text-gray-500">Data</span>
-                  <span className="font-semibold text-gray-900">
-                    {formatData(avaliacao.data_avaliacao)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between gap-3">
-                  <span className="text-gray-500">Classificação IMC</span>
-                  <span className="font-semibold text-gray-900">
-                    {classificarIMC(imc)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-black/5 p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <Scale size={18} />
-                <h3 className="font-bold text-lg">Fotos</h3>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs text-gray-500 mb-2">Frente</p>
-                  {avaliacao.foto_frente ? (
-                    <img
-                      src={avaliacao.foto_frente}
-                      alt="Foto frente"
-                      className="w-full h-60 object-cover rounded-2xl border"
-                    />
-                  ) : (
-                    <div className="w-full h-60 rounded-2xl border bg-gray-50 flex items-center justify-center text-sm text-gray-400">
-                      Sem foto
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <p className="text-xs text-gray-500 mb-2">Lado</p>
-                  {avaliacao.foto_lado ? (
-                    <img
-                      src={avaliacao.foto_lado}
-                      alt="Foto lado"
-                      className="w-full h-60 object-cover rounded-2xl border"
-                    />
-                  ) : (
-                    <div className="w-full h-60 rounded-2xl border bg-gray-50 flex items-center justify-center text-sm text-gray-400">
-                      Sem foto
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <p className="text-xs text-gray-500 mb-2">Costas</p>
-                  {avaliacao.foto_costas ? (
-                    <img
-                      src={avaliacao.foto_costas}
-                      alt="Foto costas"
-                      className="w-full h-60 object-cover rounded-2xl border"
-                    />
-                  ) : (
-                    <div className="w-full h-60 rounded-2xl border bg-gray-50 flex items-center justify-center text-sm text-gray-400">
-                      Sem foto
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </aside>
+        <div className="rounded-2xl border border-black/5 bg-gray-50 p-4">
+          <p className="text-sm text-gray-500">Resumo automático</p>
+          <p className="mt-2 text-base font-medium text-gray-900">
+            {resumoAutomatico}
+          </p>
         </div>
+      </Card>
 
-        <div className="border-t pt-5 text-xs text-gray-400 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-          <p>TreinoPrint • Relatório de avaliação física</p>
-          <p>Emitido em {new Date().toLocaleString("pt-BR")}</p>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+        <Card
+          title="Mapa corporal"
+          subtitle="Visualização atual das medidas."
+        >
+          <MapaCorporal
+  medidas={avaliacao}
+  sexo={aluno?.sexo === "feminino" ? "feminino" : "masculino"}
+/>
+        </Card>
+
+        <Card
+          title="Comparação com a avaliação anterior"
+          subtitle="Variações principais entre esta avaliação e a anterior."
+        >
+          {!avaliacaoAnterior ? (
+            <p className="text-gray-500">Esta é a primeira avaliação do aluno.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <MedidaLinha label="Peso" atual={avaliacao.peso} anterior={avaliacaoAnterior.peso} sufixo=" kg" invert />
+              <MedidaLinha label="% Gordura" atual={avaliacao.percentual_gordura} anterior={avaliacaoAnterior.percentual_gordura} sufixo="%" invert />
+              <MedidaLinha label="Cintura" atual={avaliacao.cintura} anterior={avaliacaoAnterior.cintura} invert />
+              <MedidaLinha label="Abdômen" atual={avaliacao.abdomen} anterior={avaliacaoAnterior.abdomen} invert />
+              <MedidaLinha label="Massa magra" atual={avaliacao.massa_magra} anterior={avaliacaoAnterior.massa_magra} sufixo=" kg" />
+              <MedidaLinha label="Quadril" atual={avaliacao.quadril} anterior={avaliacaoAnterior.quadril} />
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <Card
+        title="Composição corporal"
+        subtitle="Indicadores completos da avaliação."
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="rounded-xl border border-black/5 p-4">
+            <p className="text-sm text-gray-500">Peso</p>
+            <p className="mt-1 text-xl font-black">{formatNumber(avaliacao.peso)} kg</p>
+          </div>
+          <div className="rounded-xl border border-black/5 p-4">
+            <p className="text-sm text-gray-500">Altura</p>
+            <p className="mt-1 text-xl font-black">{formatNumber(avaliacao.altura, 2)} m</p>
+          </div>
+          <div className="rounded-xl border border-black/5 p-4">
+            <p className="text-sm text-gray-500">% Gordura</p>
+            <p className="mt-1 text-xl font-black">{formatNumber(avaliacao.percentual_gordura)}%</p>
+          </div>
+          <div className="rounded-xl border border-black/5 p-4">
+            <p className="text-sm text-gray-500">IMC</p>
+            <p className="mt-1 text-xl font-black">{imcAtual || 0}</p>
+          </div>
+          <div className="rounded-xl border border-black/5 p-4">
+            <p className="text-sm text-gray-500">Massa magra</p>
+            <p className="mt-1 text-xl font-black">{formatNumber(avaliacao.massa_magra)} kg</p>
+          </div>
+          <div className="rounded-xl border border-black/5 p-4">
+            <p className="text-sm text-gray-500">Massa gorda</p>
+            <p className="mt-1 text-xl font-black">{formatNumber(avaliacao.massa_gorda)} kg</p>
+          </div>
+          <div className="rounded-xl border border-black/5 p-4">
+            <p className="text-sm text-gray-500">Água corporal</p>
+            <p className="mt-1 text-xl font-black">{formatNumber(avaliacao.agua_corporal)}%</p>
+          </div>
+          <div className="rounded-xl border border-black/5 p-4">
+            <p className="text-sm text-gray-500">Gordura visceral</p>
+            <p className="mt-1 text-xl font-black">{formatNumber(avaliacao.gordura_visceral)}</p>
+          </div>
         </div>
-      </section>
+      </Card>
+
+      <Card
+        title="Medidas organizadas por região"
+        subtitle="Agora com divisão muscular mais detalhada."
+      >
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="space-y-3">
+            <h3 className="text-base font-bold text-gray-900">Tronco</h3>
+            <MedidaLinha label="Peito" atual={avaliacao.peito} anterior={avaliacaoAnterior?.peito} />
+            <MedidaLinha label="Costas" atual={avaliacao.costas} anterior={avaliacaoAnterior?.costas} />
+            <MedidaLinha label="Cintura" atual={avaliacao.cintura} anterior={avaliacaoAnterior?.cintura} invert />
+            <MedidaLinha label="Abdômen" atual={avaliacao.abdomen} anterior={avaliacaoAnterior?.abdomen} invert />
+            <MedidaLinha label="Quadril" atual={avaliacao.quadril} anterior={avaliacaoAnterior?.quadril} />
+            <MedidaLinha label="Glúteo" atual={avaliacao.gluteo} anterior={avaliacaoAnterior?.gluteo} />
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-base font-bold text-gray-900">Membros superiores</h3>
+            <MedidaLinha label="Bíceps esquerdo" atual={avaliacao.biceps_esquerdo} anterior={avaliacaoAnterior?.biceps_esquerdo} />
+            <MedidaLinha label="Bíceps direito" atual={avaliacao.biceps_direito} anterior={avaliacaoAnterior?.biceps_direito} />
+            <MedidaLinha label="Tríceps esquerdo" atual={avaliacao.triceps_esquerdo} anterior={avaliacaoAnterior?.triceps_esquerdo} />
+            <MedidaLinha label="Tríceps direito" atual={avaliacao.triceps_direito} anterior={avaliacaoAnterior?.triceps_direito} />
+            <MedidaLinha label="Antebraço esquerdo" atual={avaliacao.antebraco_esquerdo} anterior={avaliacaoAnterior?.antebraco_esquerdo} />
+            <MedidaLinha label="Antebraço direito" atual={avaliacao.antebraco_direito} anterior={avaliacaoAnterior?.antebraco_direito} />
+            <MedidaLinha label="Pulso esquerdo" atual={avaliacao.pulso_esquerdo} anterior={avaliacaoAnterior?.pulso_esquerdo} />
+            <MedidaLinha label="Pulso direito" atual={avaliacao.pulso_direito} anterior={avaliacaoAnterior?.pulso_direito} />
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-base font-bold text-gray-900">Membros inferiores</h3>
+            <MedidaLinha label="Coxa esquerda" atual={avaliacao.coxa_esquerda} anterior={avaliacaoAnterior?.coxa_esquerda} />
+            <MedidaLinha label="Coxa direita" atual={avaliacao.coxa_direita} anterior={avaliacaoAnterior?.coxa_direita} />
+            <MedidaLinha label="Panturrilha esquerda" atual={avaliacao.panturrilha_esquerda} anterior={avaliacaoAnterior?.panturrilha_esquerda} />
+            <MedidaLinha label="Panturrilha direita" atual={avaliacao.panturrilha_direita} anterior={avaliacaoAnterior?.panturrilha_direita} />
+          </div>
+        </div>
+      </Card>
+
+      <Card
+        title="Registro fotográfico"
+        subtitle="Comparação visual da avaliação."
+      >
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <FotoCard titulo="Foto frente" url={avaliacao.foto_frente} />
+          <FotoCard titulo="Foto lado" url={avaliacao.foto_lado} />
+          <FotoCard titulo="Foto costas" url={avaliacao.foto_costas} />
+        </div>
+      </Card>
     </main>
+  );
+}
+
+export default function AvaliacaoPage() {
+  return (
+    <ProtegePagina permissao="imprimir">
+      <AvaliacaoPageContent />
+    </ProtegePagina>
   );
 }

@@ -16,6 +16,22 @@ const permissoesPadrao = {
   avaliacoes: false,
 };
 
+function normalizarPermissoes(permissoes: any) {
+  return {
+    dashboard: !!permissoes?.dashboard,
+    alunos: !!permissoes?.alunos,
+    personais: !!permissoes?.personais,
+    treinos: !!permissoes?.treinos,
+    imprimir: !!permissoes?.imprimir,
+    pagamentos: !!permissoes?.pagamentos,
+    financeiro: !!permissoes?.financeiro,
+    sistema: !!permissoes?.sistema,
+    superadmin: !!permissoes?.superadmin,
+    alterar_senha: !!permissoes?.alterar_senha,
+    avaliacoes: !!permissoes?.avaliacoes,
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const academiaId = getAcademiaIdFromRequest(req);
@@ -27,7 +43,10 @@ export async function GET(req: NextRequest) {
       .order("nome", { ascending: true });
 
     if (usuariosError) {
-      return NextResponse.json({ error: usuariosError.message }, { status: 500 });
+      return NextResponse.json(
+        { error: usuariosError.message },
+        { status: 500 }
+      );
     }
 
     const { data: permissoes, error: permissoesError } = await supabaseServer
@@ -38,11 +57,18 @@ export async function GET(req: NextRequest) {
       .eq("academia_id", academiaId);
 
     if (permissoesError) {
-      return NextResponse.json({ error: permissoesError.message }, { status: 500 });
+      return NextResponse.json(
+        { error: permissoesError.message },
+        { status: 500 }
+      );
     }
 
+    const mapaPermissoes = new Map(
+      (permissoes || []).map((item) => [item.profile_id, item])
+    );
+
     const lista = (usuarios || []).map((user) => {
-      const perm = (permissoes || []).find((p) => p.profile_id === user.id);
+      const perm = mapaPermissoes.get(user.id);
 
       return {
         id: user.id,
@@ -50,10 +76,9 @@ export async function GET(req: NextRequest) {
         usuario: user.usuario,
         tipo: user.tipo,
         ativo: user.ativo,
-        permissoes: {
-          ...permissoesPadrao,
-          ...(perm || {}),
-        },
+        permissoes: perm
+          ? normalizarPermissoes(perm)
+          : { ...permissoesPadrao },
       };
     });
 
@@ -72,7 +97,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     const profile_id = String(body.profile_id || "").trim();
-    const permissoes = body.permissoes || {};
 
     if (!profile_id) {
       return NextResponse.json(
@@ -84,17 +108,7 @@ export async function POST(req: NextRequest) {
     const payload = {
       academia_id: academiaId,
       profile_id,
-      dashboard: !!permissoes.dashboard,
-      alunos: !!permissoes.alunos,
-      personais: !!permissoes.personais,
-      treinos: !!permissoes.treinos,
-      imprimir: !!permissoes.imprimir,
-      pagamentos: !!permissoes.pagamentos,
-      financeiro: !!permissoes.financeiro,
-      sistema: !!permissoes.sistema,
-      superadmin: !!permissoes.superadmin,
-      alterar_senha: !!permissoes.alterar_senha,
-      avaliacoes: !!permissoes.avaliacoes,
+      ...normalizarPermissoes(body.permissoes || {}),
     };
 
     const { data, error } = await supabaseServer
@@ -102,14 +116,19 @@ export async function POST(req: NextRequest) {
       .upsert(payload, {
         onConflict: "academia_id,profile_id",
       })
-      .select()
+      .select(
+        "profile_id, dashboard, alunos, personais, treinos, imprimir, pagamentos, financeiro, sistema, superadmin, alterar_senha, avaliacoes"
+      )
       .single();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({
+      profile_id: data.profile_id,
+      permissoes: normalizarPermissoes(data),
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Erro ao salvar permissões" },

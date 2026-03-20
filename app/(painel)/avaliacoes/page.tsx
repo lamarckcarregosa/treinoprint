@@ -83,8 +83,7 @@ function AvaliacoesHomePageContent() {
 
         <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
           <div>
-            <p className="text-sm text-zinc-300">Painel principal</p>
-            <h1 className="text-3xl md:text-4xl font-black mt-2">
+            <h1 className="text-5xl md:text-6xl font-black mt-2">
               Avaliações físicas
             </h1>
             <p className="text-zinc-300 mt-3 max-w-2xl">
@@ -98,7 +97,7 @@ function AvaliacoesHomePageContent() {
             <p className="text-xl font-black mt-1">TreinoPrint Online</p>
             <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
               <Activity size={16} />
-              Operação ativa
+              Sistema online
             </div>
           </div>
         </div>

@@ -13,7 +13,32 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Activity, ArrowRight } from "lucide-react";
+import {
+  Activity,
+  ArrowRight,
+  FileText,
+  Wallet,
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  CircleDollarSign,
+  Search,
+  CalendarDays,
+  Receipt,
+  BadgeDollarSign,
+  Filter,
+  Layers3,
+  ArrowLeftRight,
+  Users,
+  BarChart3,
+  Download,
+  FolderKanban,
+  QrCode,
+  CreditCard,
+  Banknote,
+  Barcode,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import ProtegePagina from "@/components/ProtegePagina";
 import SystemLoader from "@/components/SystemLoader";
 import SystemError from "@/components/SystemError";
@@ -68,6 +93,18 @@ type Pagamento = {
   forma_pagamento?: string | null;
 };
 
+type QuickAction = {
+  title: string;
+  description: string;
+  onClick: () => void;
+  icon: LucideIcon;
+  iconBg: string;
+  iconText: string;
+  badgeBg: string;
+  badgeText: string;
+  disabled?: boolean;
+};
+
 function formatBRL(valor: number | undefined) {
   return Number(valor || 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -75,22 +112,67 @@ function formatBRL(valor: number | undefined) {
   });
 }
 
+function formatData(data?: string | null) {
+  if (!data) return "-";
+  const dt = new Date(`${data}T00:00:00`);
+  if (Number.isNaN(dt.getTime())) return data;
+  return dt.toLocaleDateString("pt-BR");
+}
+
+function StatusPill({
+  label,
+  tone = "gray",
+}: {
+  label: string;
+  tone?: "green" | "yellow" | "red" | "blue" | "gray";
+}) {
+  const styles = {
+    green: "bg-green-100 text-green-700",
+    yellow: "bg-yellow-100 text-yellow-700",
+    red: "bg-red-100 text-red-700",
+    blue: "bg-blue-100 text-blue-700",
+    gray: "bg-zinc-100 text-zinc-700",
+  };
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${styles[tone]}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function CardInfo({
   titulo,
   valor,
   cor = "text-gray-900",
   subtitulo,
+  icon: Icon,
 }: {
   titulo: string;
   valor: string;
   cor?: string;
   subtitulo?: string;
+  icon?: LucideIcon;
 }) {
   return (
     <div className="bg-white rounded-2xl shadow p-5 border border-black/5">
-      <p className="text-sm text-gray-500">{titulo}</p>
-      <p className={`text-2xl font-black mt-2 ${cor}`}>{valor}</p>
-      {subtitulo ? <p className="text-xs text-gray-400 mt-2">{subtitulo}</p> : null}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-gray-500">{titulo}</p>
+          <p className={`text-2xl font-black mt-2 ${cor}`}>{valor}</p>
+          {subtitulo ? (
+            <p className="text-xs text-gray-400 mt-2">{subtitulo}</p>
+          ) : null}
+        </div>
+
+        {Icon ? (
+          <div className="w-11 h-11 rounded-2xl bg-zinc-100 flex items-center justify-center text-zinc-700 shrink-0">
+            <Icon size={18} />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -99,26 +181,74 @@ function QuickCard({
   title,
   description,
   onClick,
+  icon: Icon,
+  iconBg,
+  iconText,
+  badgeBg,
+  badgeText,
   disabled = false,
-}: {
-  title: string;
-  description: string;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
+}: QuickAction) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className="group w-full text-left rounded-2xl border border-black/5 bg-white px-4 py-4 shadow-sm hover:shadow-md transition disabled:opacity-60"
+      className="group w-full text-left rounded-3xl border border-black/5 bg-white p-5 shadow-sm hover:shadow-md hover:-translate-y-[1px] transition disabled:opacity-60"
     >
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="font-semibold text-sm text-zinc-900">{title}</p>
-          <p className="text-xs text-zinc-500 mt-1">{description}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-4 min-w-0">
+          <div
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${iconBg} ${iconText}`}
+          >
+            <Icon size={22} />
+          </div>
+
+          <div className="min-w-0">
+            <div
+              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${badgeBg} ${badgeText}`}
+            >
+              Acesso rápido
+            </div>
+
+            <p className="font-bold text-base text-zinc-900 mt-3 leading-snug">
+              {title}
+            </p>
+            <p className="text-sm text-zinc-500 mt-1 leading-snug">
+              {description}
+            </p>
+          </div>
         </div>
-        <ArrowRight size={16} className="text-zinc-400 transition group-hover:translate-x-1" />
+
+        <ArrowRight
+          size={16}
+          className="text-zinc-400 transition group-hover:translate-x-1 shrink-0 mt-1"
+        />
       </div>
+    </button>
+  );
+}
+
+function ModalFormaPagamentoButton({
+  active,
+  onClick,
+  label,
+  icon: Icon,
+  activeClass,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon: LucideIcon;
+  activeClass: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-xl border font-medium py-3 px-3 flex items-center justify-center gap-2 transition ${
+        active ? activeClass : "bg-white text-zinc-800 border-zinc-200"
+      }`}
+    >
+      <Icon size={16} />
+      {label}
     </button>
   );
 }
@@ -146,12 +276,6 @@ function FinanceiroPageContent() {
   const [salvandoDespesaId, setSalvandoDespesaId] = useState<number | null>(null);
   const [marcandoPagaId, setMarcandoPagaId] = useState<number | null>(null);
 
-  const [descricao, setDescricao] = useState("");
-  const [categoria, setCategoria] = useState("");
-  const [valor, setValor] = useState("");
-  const [dataLancamento, setDataLancamento] = useState("");
-  const [observacoes, setObservacoes] = useState("");
-
   const [competencia, setCompetencia] = useState(
     new Date().toISOString().slice(0, 7)
   );
@@ -161,14 +285,18 @@ function FinanceiroPageContent() {
   const [filtroDespesaCategoria, setFiltroDespesaCategoria] = useState("");
   const [filtroDespesaTipo, setFiltroDespesaTipo] = useState("todos");
 
+  const [buscaPagamento, setBuscaPagamento] = useState("");
+  const [buscaInadimplente, setBuscaInadimplente] = useState("");
+  const [filtroAtraso, setFiltroAtraso] = useState("todos");
+
   const [loading, setLoading] = useState(true);
-  const [salvando, setSalvando] = useState(false);
   const [gerandoMensalidades, setGerandoMensalidades] = useState(false);
   const [gerandoDespesasFixas, setGerandoDespesasFixas] = useState(false);
   const [gerandoTudoLoading, setGerandoTudoLoading] = useState(false);
   const [erro, setErro] = useState("");
 
-  const [pagamentoSelecionado, setPagamentoSelecionado] = useState<Pagamento | null>(null);
+  const [pagamentoSelecionado, setPagamentoSelecionado] =
+    useState<Pagamento | null>(null);
   const [formaPagamento, setFormaPagamento] = useState("pix");
   const [salvandoPagamento, setSalvandoPagamento] = useState(false);
 
@@ -204,7 +332,9 @@ function FinanceiroPageContent() {
       }
 
       if (!resInadimplentes.ok) {
-        setErro((jsonInadimplentes as any).error || "Erro ao carregar inadimplência");
+        setErro(
+          (jsonInadimplentes as any).error || "Erro ao carregar inadimplência"
+        );
         return;
       }
 
@@ -227,7 +357,7 @@ function FinanceiroPageContent() {
     }
   };
 
-  const gerarPix = async (valor: number) => {
+  const gerarPix = async (valorPagamento: number) => {
     try {
       setGerandoPix(true);
 
@@ -235,7 +365,7 @@ function FinanceiroPageContent() {
         pixKey: "79996320601",
         merchantName: "TREINOPRINT",
         merchantCity: "POCO VERDE",
-        amount: valor.toFixed(2),
+        amount: valorPagamento.toFixed(2),
         message: "Mensalidade Academia",
       });
 
@@ -244,6 +374,10 @@ function FinanceiroPageContent() {
 
       setPixQrCode(qr);
       setPixCopiaECola(payload);
+    } catch {
+      setPixQrCode("");
+      setPixCopiaECola("");
+      alert("Erro ao gerar PIX");
     } finally {
       setGerandoPix(false);
     }
@@ -262,50 +396,6 @@ function FinanceiroPageContent() {
     init();
   }, [statusFiltro, competencia, dataInicio, dataFim]);
 
-  const cadastrarDespesa = async () => {
-    try {
-      setErro("");
-
-      if (!descricao || !valor || !dataLancamento) {
-        setErro("Preencha descrição, valor e data");
-        return;
-      }
-
-      setSalvando(true);
-
-      const res = await apiFetch("/api/financeiro/despesas", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          descricao,
-          categoria,
-          valor: Number(valor),
-          data_lancamento: dataLancamento,
-          observacoes,
-        }),
-      });
-
-      const json = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setErro((json as any).error || "Erro ao cadastrar despesa");
-        return;
-      }
-
-      setDescricao("");
-      setCategoria("");
-      setValor("");
-      setDataLancamento("");
-      setObservacoes("");
-
-      await carregarTudo();
-    } finally {
-      setSalvando(false);
-    }
-  };
-
   const confirmarPagamento = async () => {
     if (!pagamentoSelecionado) return;
 
@@ -316,9 +406,7 @@ function FinanceiroPageContent() {
         `/api/financeiro/pagamentos/${pagamentoSelecionado.id}/marcar-pago`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             forma_pagamento: formaPagamento,
           }),
@@ -366,9 +454,7 @@ function FinanceiroPageContent() {
 
       const res = await apiFetch(`/api/financeiro/despesas/${item.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(item),
       });
 
@@ -443,9 +529,7 @@ function FinanceiroPageContent() {
 
       const res = await apiFetch("/api/financeiro/gerar-mensalidades", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ competencia }),
       });
 
@@ -470,9 +554,7 @@ function FinanceiroPageContent() {
 
       const res = await apiFetch("/api/financeiro/gerar-despesas-fixas", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ competencia }),
       });
 
@@ -497,9 +579,7 @@ function FinanceiroPageContent() {
 
       const res = await apiFetch("/api/financeiro/gerar-tudo", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ competencia }),
       });
 
@@ -519,11 +599,11 @@ function FinanceiroPageContent() {
     }
   };
 
-  const exportarExcel = async () => {
+  const exportarCSV = async () => {
     const academiaId = localStorage.getItem("treinoprint_academia_id");
 
     const res = await fetch(
-      `/api/financeiro/exportar-excel?inicio=${dataInicio}&fim=${dataFim}`,
+      `/api/financeiro/exportar-csv?inicio=${dataInicio}&fim=${dataFim}`,
       {
         headers: {
           "x-academia-id": academiaId || "",
@@ -533,7 +613,7 @@ function FinanceiroPageContent() {
 
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
-      alert((json as any).error || "Erro ao exportar Excel");
+      alert((json as any).error || "Erro ao exportar CSV");
       return;
     }
 
@@ -542,7 +622,7 @@ function FinanceiroPageContent() {
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = "financeiro.xlsx";
+    a.download = "financeiro.csv";
     a.click();
 
     window.URL.revokeObjectURL(url);
@@ -596,11 +676,15 @@ function FinanceiroPageContent() {
     0
   );
 
+  const totalDespesasPendentes = useMemo(() => {
+    return despesas
+      .filter((item) => item.status !== "pago")
+      .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+  }, [despesas]);
+
   const categoriasDespesas = [
     ...new Set(
-      despesas
-        .map((d) => (d.categoria || "").trim())
-        .filter(Boolean)
+      despesas.map((d) => (d.categoria || "").trim()).filter(Boolean)
     ),
   ];
 
@@ -608,11 +692,14 @@ function FinanceiroPageContent() {
     const matchTexto =
       !filtroDespesaTexto ||
       item.descricao.toLowerCase().includes(filtroDespesaTexto.toLowerCase()) ||
-      (item.observacoes || "").toLowerCase().includes(filtroDespesaTexto.toLowerCase());
+      (item.observacoes || "")
+        .toLowerCase()
+        .includes(filtroDespesaTexto.toLowerCase());
 
     const matchCategoria =
       !filtroDespesaCategoria ||
-      (item.categoria || "").toLowerCase() === filtroDespesaCategoria.toLowerCase();
+      (item.categoria || "").toLowerCase() ===
+        filtroDespesaCategoria.toLowerCase();
 
     const tipoItem = item.tipo || "variavel";
     const matchTipo =
@@ -621,12 +708,86 @@ function FinanceiroPageContent() {
     return matchTexto && matchCategoria && matchTipo;
   });
 
+  const pagamentosFiltrados = pagamentos.filter((item) => {
+    const termo = buscaPagamento.toLowerCase().trim();
+    if (!termo) return true;
+
+    return (
+      String(item.aluno_nome || "").toLowerCase().includes(termo) ||
+      String(item.competencia || "").toLowerCase().includes(termo) ||
+      String(item.status || "").toLowerCase().includes(termo)
+    );
+  });
+
+  const inadimplentesFiltrados = inadimplentes.filter((item) => {
+    const termo = buscaInadimplente.toLowerCase().trim();
+
+    const matchBusca =
+      !termo ||
+      String(item.aluno_nome || "").toLowerCase().includes(termo) ||
+      String(item.telefone || "").toLowerCase().includes(termo);
+
+    const atraso = item.maior_dias_atraso;
+
+    const matchAtraso =
+      filtroAtraso === "todos" ||
+      (filtroAtraso === "1_30" && atraso >= 1 && atraso <= 30) ||
+      (filtroAtraso === "31_60" && atraso >= 31 && atraso <= 60) ||
+      (filtroAtraso === "61_plus" && atraso >= 61);
+
+    return matchBusca && matchAtraso;
+  });
+
   const alertaTop =
     (resumo?.inadimplencia || 0) > 0
       ? `Atenção: ${inadimplentes.length} aluno(s) inadimplente(s), ${totalParcelasAtrasadas} parcela(s) atrasada(s), total em aberto de ${formatBRL(
           resumo?.inadimplencia || 0
         )}.`
       : "Nenhuma inadimplência no momento.";
+
+  const quickActions: QuickAction[] = [
+    {
+      title: gerandoTudoLoading ? "Gerando..." : "Gerar tudo",
+      description: "Mensalidades e despesas fixas",
+      onClick: gerarTudo,
+      disabled: gerandoTudoLoading,
+      icon: Layers3,
+      iconBg: "bg-violet-100",
+      iconText: "text-violet-700",
+      badgeBg: "bg-violet-50",
+      badgeText: "text-violet-700",
+    },
+    {
+      title: "Fluxo de caixa",
+      description: "Entradas e saídas do período",
+      onClick: () => router.push("/financeiro/fluxo-caixa"),
+      icon: ArrowLeftRight,
+      iconBg: "bg-blue-100",
+      iconText: "text-blue-700",
+      badgeBg: "bg-blue-50",
+      badgeText: "text-blue-700",
+    },
+    {
+      title: "Mensalidades dos alunos",
+      description: "Cobranças e controle",
+      onClick: () => router.push("/financeiro/alunos"),
+      icon: Users,
+      iconBg: "bg-emerald-100",
+      iconText: "text-emerald-700",
+      badgeBg: "bg-emerald-50",
+      badgeText: "text-emerald-700",
+    },
+    {
+      title: "Dashboard financeiro",
+      description: "Indicadores e visão geral",
+      onClick: () => router.push("/financeiro/dashboard"),
+      icon: BarChart3,
+      iconBg: "bg-cyan-100",
+      iconText: "text-cyan-700",
+      badgeBg: "bg-cyan-50",
+      badgeText: "text-cyan-700",
+    },
+  ];
 
   if (loading) {
     return (
@@ -653,19 +814,21 @@ function FinanceiroPageContent() {
         <div className="absolute -right-10 -top-10 w-72 h-72 bg-[#7CFC00]/10 blur-3xl rounded-full" />
 
         <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
-          <div>
-            <p className="text-sm text-zinc-300">Painel principal</p>
-            <h1 className="text-3xl md:text-4xl font-black mt-2">
-              Bem-vindo ao Financeiro
+          <div className="min-w-0 flex-1">
+            <h1 className="text-5xl md:text-6xl font-black mt-2">
+              Financeiro
             </h1>
             <p className="text-zinc-300 mt-3 max-w-2xl">
-              Controle inadimplência, pagamentos, despesas e mensalidades da academia.
+              Controle inadimplência, pagamentos, despesas e mensalidades da
+              academia.
             </p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
+          <div className="w-full xl:w-auto xl:min-w-[260px] bg-white/10 backdrop-blur rounded-3xl px-5 py-4 shrink-0">
             <p className="text-white/60 text-xs">Status do sistema</p>
-            <p className="text-xl font-black mt-1">TreinoPrint Online</p>
+            <p className="text-lg md:text-xl font-black mt-1">
+              TreinoPrint Online
+            </p>
             <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
               <Activity size={16} />
               Sistema online
@@ -675,73 +838,65 @@ function FinanceiroPageContent() {
       </section>
 
       <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-4">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">Acessos rápidos</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Atalhos rápidos do módulo financeiro
-          </p>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Acessos rápidos</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Atalhos rápidos do módulo financeiro
+            </p>
+          </div>
+
+          <button
+            onClick={() => router.push("/financeiro/despesas")}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-3 text-white hover:bg-black transition"
+          >
+            <FolderKanban size={16} />
+            Abrir cadastro de despesas
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 w-full">
-          <QuickCard
-            title={gerandoTudoLoading ? "Gerando..." : "Gerar tudo"}
-            description="Gera mensalidades e despesas fixas"
-            onClick={gerarTudo}
-            disabled={gerandoTudoLoading}
-          />
-
-          <QuickCard
-            title="Fluxo de caixa"
-            description="Entradas e saídas do período"
-            onClick={() => router.push("/financeiro/fluxo-caixa")}
-          />
-
-          <QuickCard
-            title="Cadastro de despesas"
-            description="Gerencie despesas fixas e variáveis"
-            onClick={() => router.push("/financeiro/despesas")}
-          />
-
-          <QuickCard
-            title="Mensalidades dos alunos"
-            description="Consulta e controle das cobranças"
-            onClick={() => router.push("/financeiro/alunos")}
-          />
-
-          <QuickCard
-            title="Dashboard financeiro"
-            description="Indicadores e visão geral"
-            onClick={() => router.push("/financeiro/dashboard")}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {quickActions.map((item) => (
+            <QuickCard key={item.title} {...item} />
+          ))}
         </div>
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <input
-          type="date"
-          value={dataInicio}
-          onChange={(e) => setDataInicio(e.target.value)}
-          className="border rounded-xl px-4 py-3"
-        />
-        <input
-          type="date"
-          value={dataFim}
-          onChange={(e) => setDataFim(e.target.value)}
-          className="border rounded-xl px-4 py-3"
-        />
-        <button
-          onClick={exportarExcel}
-          className="bg-emerald-700 text-white px-5 py-3 rounded-xl"
-        >
-          Exportar Excel
-        </button>
-        <button
-          onClick={exportarPDF}
-          className="bg-red-600 text-white px-5 py-3 rounded-xl"
-        >
-          Exportar PDF
-        </button>
-      </div>
+      <section className="bg-white rounded-2xl shadow p-6 border border-black/5 space-y-4">
+        <div className="flex items-center gap-2">
+          <CalendarDays size={18} className="text-zinc-700" />
+          <h2 className="text-xl font-bold text-gray-900">Período e exportação</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input
+            type="date"
+            value={dataInicio}
+            onChange={(e) => setDataInicio(e.target.value)}
+            className="border rounded-xl px-4 py-3"
+          />
+          <input
+            type="date"
+            value={dataFim}
+            onChange={(e) => setDataFim(e.target.value)}
+            className="border rounded-xl px-4 py-3"
+          />
+          <button
+            onClick={exportarCSV}
+            className="bg-emerald-700 text-white px-5 py-3 rounded-xl inline-flex items-center justify-center gap-2"
+          >
+            <Download size={16} />
+            Exportar CSV
+          </button>
+          <button
+            onClick={exportarPDF}
+            className="bg-red-600 text-white px-5 py-3 rounded-xl inline-flex items-center justify-center gap-2"
+          >
+            <FileText size={16} />
+            Exportar PDF
+          </button>
+        </div>
+      </section>
 
       <div
         className={`rounded-2xl border px-4 py-3 text-sm ${
@@ -755,36 +910,48 @@ function FinanceiroPageContent() {
 
       {erro ? <p className="text-red-600 text-sm">{erro}</p> : null}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-5 md:grid-cols-1 xl:grid-cols-4 gap-1">
         <CardInfo
           titulo="Receita do período"
           valor={formatBRL(resumo?.receitaMes || 0)}
           cor="text-green-600"
+          icon={TrendingUp}
         />
         <CardInfo
           titulo="Em aberto"
           valor={formatBRL(resumo?.emAberto || 0)}
           cor="text-yellow-600"
+          icon={Wallet}
         />
         <CardInfo
           titulo="Despesas"
           valor={formatBRL(resumo?.despesasMes || 0)}
           cor="text-red-600"
+          icon={TrendingDown}
         />
         <CardInfo
           titulo="Saldo"
           valor={formatBRL(resumo?.saldo || 0)}
           cor={(resumo?.saldo || 0) >= 0 ? "text-blue-600" : "text-red-700"}
+          icon={CircleDollarSign}
         />
         <CardInfo
-          titulo="Alunos inadimplentes"
+          titulo="Inadimplentes"
           valor={String(inadimplentes.length)}
           subtitulo="Quantidade de alunos"
+          icon={AlertTriangle}
         />
         <CardInfo
           titulo="Maior atraso"
           valor={`${maiorAtrasoDias} dias`}
           subtitulo="Maior atraso encontrado"
+          icon={Receipt}
+        />
+        <CardInfo
+          titulo="Despesas pendentes"
+          valor={formatBRL(totalDespesasPendentes)}
+          subtitulo="Ainda não pagas"
+          icon={BadgeDollarSign}
         />
       </div>
 
@@ -849,99 +1016,6 @@ function FinanceiroPageContent() {
       </div>
 
       <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <h2 className="font-semibold">Inadimplência por aluno</h2>
-          <span className="text-sm text-gray-500">
-            {inadimplentes.length} aluno(s) com atraso
-          </span>
-        </div>
-
-        {inadimplentes.length === 0 ? (
-          <p className="text-gray-500">Nenhum aluno inadimplente.</p>
-        ) : (
-          <div className="space-y-4">
-            {inadimplentes.map((item) => (
-              <div key={item.aluno_id} className="border rounded-2xl p-4">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div>
-                    <p className="font-bold">{item.aluno_nome}</p>
-                    <p className="text-sm text-gray-500">
-                      {item.qtd_parcelas} parcela(s) em atraso • maior atraso de{" "}
-                      {item.maior_dias_atraso} dias
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-red-600 font-semibold">
-                      Total em aberto: {formatBRL(item.total_em_aberto)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  {item.itens.map((parcela) => (
-                    <div
-                      key={parcela.id}
-                      className="rounded-xl border px-3 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
-                    >
-                      <div>
-                        <p className="text-sm font-medium">
-                          Competência: {parcela.competencia}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Vencimento: {parcela.vencimento} • {parcela.dias_atraso} dias de atraso
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span className="text-sm font-semibold text-red-600">
-                          {formatBRL(parcela.valor)}
-                        </span>
-                        <button
-                          onClick={async () => {
-                            setPagamentoSelecionado({
-                              id: parcela.id,
-                              aluno_id: item.aluno_id,
-                              aluno_nome: item.aluno_nome,
-                              competencia: parcela.competencia,
-                              valor: parcela.valor,
-                              vencimento: parcela.vencimento,
-                              status: "pendente",
-                            });
-                            setFormaPagamento("pix");
-                            await gerarPix(parcela.valor);
-                          }}
-                          className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2"
-                        >
-                          Receber pagamento
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-
-                  <div className="pt-2">
-                    <button
-                      onClick={() =>
-                        cobrarWhatsApp(
-                          item.aluno_nome,
-                          item.total_em_aberto,
-                          item.itens[0]?.competencia || "",
-                          item.telefone
-                        )
-                      }
-                      className="bg-green-700 hover:bg-green-800 text-white rounded-xl px-4 py-2"
-                    >
-                      Cobrar no WhatsApp
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="bg-white rounded-2xl shadow p-6 border border-black/5">
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
           <h2 className="font-semibold">Despesas lançadas</h2>
 
@@ -981,7 +1055,7 @@ function FinanceiroPageContent() {
         {despesasFiltradas.length === 0 ? (
           <p className="text-gray-500">Nenhuma despesa encontrada.</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[650px] overflow-y-auto pr-1">
             {despesasFiltradas.map((item) => {
               const editando = despesaEditandoId === item.id;
               const despesaPaga = item.status === "pago";
@@ -992,33 +1066,29 @@ function FinanceiroPageContent() {
                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                       <div className="space-y-1">
                         <p className="font-bold text-gray-900">{item.descricao}</p>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <StatusPill
+                            label={item.categoria || "Sem categoria"}
+                            tone="blue"
+                          />
+                          <StatusPill
+                            label={item.tipo || "variavel"}
+                            tone="gray"
+                          />
+                          <StatusPill
+                            label={despesaPaga ? "Paga" : "Pendente"}
+                            tone={despesaPaga ? "green" : "yellow"}
+                          />
+                        </div>
                         <p className="text-sm text-gray-600">
-                          Categoria: {item.categoria || "-"}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Tipo: {item.tipo || "variavel"}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Data lançamento: {item.data_lancamento || "-"}
+                          Data lançamento: {formatData(item.data_lancamento)}
                         </p>
                         <p className="text-sm text-gray-600">
                           Valor: {formatBRL(item.valor)}
                         </p>
-                        <p className="text-sm">
-                          Status:{" "}
-                          <span
-                            className={
-                              despesaPaga
-                                ? "text-green-600 font-semibold"
-                                : "text-yellow-600 font-semibold"
-                            }
-                          >
-                            {despesaPaga ? "Paga" : "Pendente"}
-                          </span>
-                        </p>
                         {item.data_pagamento ? (
                           <p className="text-sm text-green-600">
-                            Pago em: {item.data_pagamento}
+                            Pago em: {formatData(item.data_pagamento)}
                           </p>
                         ) : null}
                         {item.observacoes ? (
@@ -1147,7 +1217,7 @@ function FinanceiroPageContent() {
 
       {pagamentoSelecionado && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-center">
               Registrar pagamento
             </h2>
@@ -1161,52 +1231,52 @@ function FinanceiroPageContent() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <button
+              <ModalFormaPagamentoButton
+                active={formaPagamento === "pix"}
                 onClick={async () => {
                   setFormaPagamento("pix");
                   await gerarPix(pagamentoSelecionado.valor);
                 }}
-                className={`rounded-xl py-3 border font-medium ${
-                  formaPagamento === "pix"
-                    ? "bg-green-600 text-white border-green-600"
-                    : "bg-white"
-                }`}
-              >
-                PIX
-              </button>
+                label="PIX"
+                icon={QrCode}
+                activeClass="bg-green-600 text-white border-green-600"
+              />
 
-              <button
-                onClick={() => setFormaPagamento("cartao")}
-                className={`rounded-xl py-3 border font-medium ${
-                  formaPagamento === "cartao"
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white"
-                }`}
-              >
-                Cartão
-              </button>
+              <ModalFormaPagamentoButton
+                active={formaPagamento === "cartao"}
+                onClick={() => {
+                  setFormaPagamento("cartao");
+                  setPixQrCode("");
+                  setPixCopiaECola("");
+                }}
+                label="Cartão"
+                icon={CreditCard}
+                activeClass="bg-blue-600 text-white border-blue-600"
+              />
 
-              <button
-                onClick={() => setFormaPagamento("dinheiro")}
-                className={`rounded-xl py-3 border font-medium ${
-                  formaPagamento === "dinheiro"
-                    ? "bg-yellow-500 text-white border-yellow-500"
-                    : "bg-white"
-                }`}
-              >
-                Dinheiro
-              </button>
+              <ModalFormaPagamentoButton
+                active={formaPagamento === "dinheiro"}
+                onClick={() => {
+                  setFormaPagamento("dinheiro");
+                  setPixQrCode("");
+                  setPixCopiaECola("");
+                }}
+                label="Dinheiro"
+                icon={Banknote}
+                activeClass="bg-yellow-500 text-white border-yellow-500"
+              />
 
-              <button
-                onClick={() => setFormaPagamento("boleto")}
-                className={`rounded-xl py-3 border font-medium ${
-                  formaPagamento === "boleto"
-                    ? "bg-gray-800 text-white border-gray-800"
-                    : "bg-white"
-                }`}
-              >
-                Boleto
-              </button>
+              <ModalFormaPagamentoButton
+                active={formaPagamento === "boleto"}
+                onClick={() => {
+                  setFormaPagamento("boleto");
+                  setPixQrCode("");
+                  setPixCopiaECola("");
+                }}
+                label="Boleto"
+                icon={Barcode}
+                activeClass="bg-gray-800 text-white border-gray-800"
+              />
             </div>
 
             {formaPagamento === "pix" ? (
@@ -1246,9 +1316,25 @@ function FinanceiroPageContent() {
                       Copiar código PIX
                     </button>
                   </>
-                ) : null}
+                ) : (
+                  <p className="text-sm text-red-600 text-center">
+                    Não foi possível gerar o PIX.
+                  </p>
+                )}
               </div>
             ) : null}
+
+            <div className="rounded-2xl border bg-zinc-50 p-4 text-sm text-zinc-700">
+              {formaPagamento === "dinheiro" ? (
+                <p>Confirme somente após receber o valor em dinheiro no caixa.</p>
+              ) : formaPagamento === "cartao" ? (
+                <p>Confirme somente após a aprovação da cobrança no cartão.</p>
+              ) : formaPagamento === "boleto" ? (
+                <p>Confirme somente após validar o recebimento do boleto.</p>
+              ) : (
+                <p>Confirme somente após o aluno concluir o pagamento via PIX.</p>
+              )}
+            </div>
 
             <div className="flex gap-3">
               <button
