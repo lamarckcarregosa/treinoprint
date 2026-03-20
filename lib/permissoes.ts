@@ -10,7 +10,8 @@ export type Permissao =
   | "financeiro"
   | "sistema"
   | "superadmin"
-  | "alterar_senha";
+  | "alterar_senha"
+  | "avaliacoes";
 
 export type PermissoesObjeto = Record<Permissao, boolean>;
 
@@ -26,6 +27,7 @@ export const permissoesPadraoPorTipo: Record<TipoUsuario, PermissoesObjeto> = {
     sistema: true,
     superadmin: true,
     alterar_senha: true,
+    avaliacoes: true
   },
   admin: {
     dashboard: true,
@@ -38,6 +40,7 @@ export const permissoesPadraoPorTipo: Record<TipoUsuario, PermissoesObjeto> = {
     sistema: true,
     superadmin: false,
     alterar_senha: true,
+    avaliacoes: true
   },
   personal: {
     dashboard: false,
@@ -50,6 +53,7 @@ export const permissoesPadraoPorTipo: Record<TipoUsuario, PermissoesObjeto> = {
     sistema: false,
     superadmin: false,
     alterar_senha: true,
+    avaliacoes: true
   },
   recepcao: {
     dashboard: false,
@@ -62,6 +66,7 @@ export const permissoesPadraoPorTipo: Record<TipoUsuario, PermissoesObjeto> = {
     sistema: false,
     superadmin: false,
     alterar_senha: true,
+    avaliacoes: false
   },
 };
 
