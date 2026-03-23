@@ -6,6 +6,12 @@ import { supabase } from "@/lib/supabase";
 import PageContainer from "@/components/layout/PageContainer";
 import SectionCard from "@/components/common/SectionCard";
 import StatusBadge from "@/components/common/StatusBadge";
+import {
+  formatarTelefoneDigitacao,
+  formatarTelefoneExibicao,
+  normalizarTelefoneBR,
+  telefoneBRValido,
+} from "@/lib/telefone";
 
 import {
   ChartColumnBig,
@@ -127,6 +133,8 @@ export default function AlunoPage() {
 
   const [sexo, setSexo] = useState("masculino");
 
+  const [erroTelefone, setErroTelefone] = useState("");
+
   const [aluno, setAluno] = useState<Aluno | null>(null);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [impressoes, setImpressoes] = useState<Impressao[]>([]);
@@ -223,7 +231,7 @@ export default function AlunoPage() {
       setImpressoes(Array.isArray(jsonImpressoes) ? jsonImpressoes : []);
 
       setNome(jsonAluno.nome || "");
-      setTelefone(jsonAluno.telefone || "");
+      setTelefone(formatarTelefoneExibicao(jsonAluno.telefone || ""));
       setCpf(jsonAluno.cpf || "");
       setEndereco(jsonAluno.endereco || "");
       setDataNascimento(jsonAluno.data_nascimento || "");
@@ -314,27 +322,36 @@ export default function AlunoPage() {
       const { data } = supabase.storage.from("alunos").getPublicUrl(nomeArquivo);
 
       const urlFoto = data.publicUrl;
+const telefoneNormalizado = telefone.trim()
+  ? normalizarTelefoneBR(telefone)
+  : "";
 
-      const res = await apiFetch(`/api/alunos/${aluno.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          nome,
-          telefone,
-          cpf,
-          endereco,
-          data_nascimento: dataNascimento || null,
-          plano,
-          sexo,
-          data_matricula: dataMatricula || null,
-          status,
-          foto_url: urlFoto,
-          objetivo,
-          peso_meta: pesoMeta ? Number(pesoMeta) : null,
-        }),
-      });
+if (telefone.trim() && !telefoneBRValido(telefone)) {
+  setErroTelefone("Informe um celular válido com DDD.");
+  alert("Informe um telefone válido antes de salvar a foto.");
+  return;
+}
+
+const res = await apiFetch(`/api/alunos/${aluno.id}`, {
+  method: "PUT",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    nome,
+    telefone: telefoneNormalizado || null,
+    cpf,
+    endereco,
+    data_nascimento: dataNascimento || null,
+    plano,
+    sexo,
+    data_matricula: dataMatricula || null,
+    status,
+    foto_url: urlFoto,
+    objetivo,
+    peso_meta: pesoMeta ? Number(pesoMeta) : null,
+  }),
+});
 
       const json = await res.json().catch(() => ({}));
 
@@ -351,51 +368,62 @@ export default function AlunoPage() {
     }
   };
 
-  const salvarAluno = async () => {
-    try {
-      if (!nome.trim()) {
-        alert("Nome é obrigatório");
-        return;
-      }
-
-      setSalvandoAluno(true);
-
-      const res = await apiFetch(`/api/alunos/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          nome: nome.trim(),
-          telefone: telefone.trim(),
-          cpf: cpf.trim(),
-          endereco: endereco.trim(),
-          data_nascimento: dataNascimento || null,
-          sexo: sexo.trim(),
-          plano: plano.trim(),
-          data_matricula: dataMatricula || null,
-          status: status.trim(),
-          foto_url: fotoUrl.trim(),
-          objetivo: objetivo.trim(),
-          peso_meta: pesoMeta ? Number(pesoMeta) : null,
-        }),
-      });
-
-      const json = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        console.error("Erro ao atualizar aluno:", json);
-        alert(json.error || JSON.stringify(json) || "Erro ao atualizar aluno");
-        return;
-      }
-
-      setEditando(false);
-      await carregar();
-      alert("Aluno atualizado com sucesso");
-    } finally {
-      setSalvandoAluno(false);
+ const salvarAluno = async () => {
+  try {
+    if (!nome.trim()) {
+      alert("Nome é obrigatório");
+      return;
     }
-  };
+
+    const telefoneNormalizado = telefone.trim()
+      ? normalizarTelefoneBR(telefone)
+      : "";
+
+    if (telefone.trim() && !telefoneBRValido(telefone)) {
+      setErroTelefone("Informe um celular válido com DDD.");
+      alert("Informe um telefone válido.");
+      return;
+    }
+
+    setErroTelefone("");
+    setSalvandoAluno(true);
+
+    const res = await apiFetch(`/api/alunos/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        nome: nome.trim(),
+        telefone: telefoneNormalizado || null,
+        cpf: cpf.trim(),
+        endereco: endereco.trim(),
+        data_nascimento: dataNascimento || null,
+        sexo: sexo.trim(),
+        plano: plano.trim(),
+        data_matricula: dataMatricula || null,
+        status: status.trim(),
+        foto_url: fotoUrl.trim(),
+        objetivo: objetivo.trim(),
+        peso_meta: pesoMeta ? Number(pesoMeta) : null,
+      }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      console.error("Erro ao atualizar aluno:", json);
+      alert(json.error || JSON.stringify(json) || "Erro ao atualizar aluno");
+      return;
+    }
+
+    setEditando(false);
+    await carregar();
+    alert("Aluno atualizado com sucesso");
+  } finally {
+    setSalvandoAluno(false);
+  }
+};
 
   const imprimirFicha = () => {
     router.push(`/alunos/${id}/imprimir`);
@@ -622,7 +650,7 @@ export default function AlunoPage() {
                   <strong>Nome:</strong> {aluno.nome}
                 </p>
                 <p>
-                  <strong>Telefone:</strong> {aluno.telefone || "-"}
+                  <strong>Telefone:</strong> {formatarTelefoneExibicao(aluno.telefone)}
                 </p>
                 <p>
                   <strong>CPF:</strong> {aluno.cpf || "-"}
@@ -684,12 +712,33 @@ export default function AlunoPage() {
                   className="rounded-xl border p-3"
                 />
 
-                <input
-                  value={telefone}
-                  onChange={(e) => setTelefone(e.target.value)}
-                  placeholder="Telefone"
-                  className="rounded-xl border p-3"
-                />
+                <div className="space-y-1">
+  <input
+    value={telefone}
+    onChange={(e) => {
+      const formatado = formatarTelefoneDigitacao(e.target.value);
+      setTelefone(formatado);
+
+      if (erroTelefone) {
+        setErroTelefone("");
+      }
+    }}
+    onBlur={() => {
+      if (telefone.trim() && !telefoneBRValido(telefone)) {
+        setErroTelefone("Informe um celular válido com DDD.");
+      } else {
+        setErroTelefone("");
+      }
+    }}
+    placeholder="Telefone"
+    className={`rounded-xl border p-3 w-full ${
+      erroTelefone ? "border-red-500" : ""
+    }`}
+  />
+  {erroTelefone ? (
+    <p className="text-sm text-red-600">{erroTelefone}</p>
+  ) : null}
+</div>
 
                 <input
                   value={cpf}
