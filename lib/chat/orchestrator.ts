@@ -1,7 +1,15 @@
 import { sendWhatsAppText } from "@/lib/whatsapp";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { buscarAlunoPorTelefone } from "@/lib/db/alunos";
-import { buscarTreinoDoDia } from "@/lib/db/treinos";
+import { buscarTreinoDoAluno } from "@/lib/db/treinos";
 import { buscarMensalidadesAbertas } from "@/lib/db/financeiro";
+import { buscarPagamentoAtualComLink } from "@/lib/db/financeiro-link";
+import {
+  obterOuCriarConversa,
+  salvarMensagemAluno,
+  atualizarSetorConversa,
+} from "@/lib/db/whatsapp";
+import { classificarMensagem } from "@/lib/chat/classificador";
 
 type ProcessMessageParams = {
   telefone: string;
@@ -33,6 +41,30 @@ export async function processarMensagem({
   console.log("Aluno encontrado:", aluno.nome);
   console.log("Academia ID:", academiaId);
 
+  const conversa = await obterOuCriarConversa({
+    academiaId,
+    alunoId: aluno.id,
+    telefone: telefoneResposta,
+    nome: aluno.nome,
+  });
+
+  await salvarMensagemAluno({
+    conversaId: conversa.id,
+    academiaId,
+    alunoId: aluno.id,
+    mensagem: texto,
+  });
+
+  const setor = classificarMensagem(texto) as
+    | "recepcao"
+    | "professor"
+    | "financeiro";
+
+  await atualizarSetorConversa(conversa.id, setor);
+
+  console.log("Conversa ID:", conversa.id);
+  console.log("Setor definido:", setor);
+
   let resposta = "";
 
   if (ehSaudacao(msg) || msg === "menu" || msg === "0") {
@@ -47,8 +79,11 @@ export async function processarMensagem({
       "manda meu treino",
     ])
   ) {
-    const treino = await buscarTreinoDoDia(aluno.id, academiaId);
-    resposta = treino ? montarRespostaTreino(nome, treino) : respostaSemTreino(nome);
+    const treino = await buscarTreinoDoAluno(aluno.id, academiaId);
+    console.log("Treino encontrado no WhatsApp:", JSON.stringify(treino, null, 2));
+    resposta = treino
+      ? montarRespostaTreino(nome, treino)
+      : respostaSemTreino(nome);
   } else if (
     msg === "2" ||
     contemAlgum(msg, [
@@ -61,6 +96,7 @@ export async function processarMensagem({
       "quanto devo",
       "debito",
       "débito",
+      "valor",
     ])
   ) {
     const itens = await buscarMensalidadesAbertas(aluno.id, academiaId);
@@ -78,22 +114,72 @@ export async function processarMensagem({
     resposta = respostaHorarios(nome);
   } else if (
     msg === "4" ||
-    contemAlgum(msg, ["professor", "personal", "instrutor", "dor", "lesao", "lesão"])
+    contemAlgum(msg, [
+      "professor",
+      "personal",
+      "instrutor",
+      "duvida",
+      "dúvida",
+      "dor",
+      "lesao",
+      "lesão",
+      "desconforto",
+      "trocar treino",
+      "troca treino",
+    ])
   ) {
     resposta = respostaProfessor(nome);
   } else if (
     msg === "5" ||
-    contemAlgum(msg, ["recepcao", "recepção", "atendente", "planos", "matricula", "matrícula"])
+    contemAlgum(msg, [
+      "recepcao",
+      "recepção",
+      "atendente",
+      "planos",
+      "matricula",
+      "matrícula",
+      "localizacao",
+      "localização",
+      "endereco",
+      "endereço",
+    ])
   ) {
     resposta = respostaRecepcao(nome);
+  } else if (
+    msg === "6" ||
+    contemAlgum(msg, [
+      "link de pagamento",
+      "abrir link",
+      "quero pagar",
+      "pagar agora",
+      "segunda via",
+      "segunda via pagamento",
+      "link pix",
+    ])
+  ) {
+    resposta = await processarSolicitacaoLinkPagamento(
+      aluno.id,
+      academiaId,
+      nome
+    );
   } else {
     resposta = respostaFallback(nome);
   }
 
   await sendWhatsAppText(telefoneResposta, resposta);
+
+  await supabaseAdmin.rpc("whatsapp_salvar_mensagem", {
+    p_conversa_id: conversa.id,
+    p_academia_id: academiaId,
+    p_aluno_id: aluno.id,
+    p_origem: "bot",
+    p_mensagem: resposta,
+  });
 }
 
-/* helpers */
+/* =========================
+   HELPERS
+   ========================= */
 
 function limparNumero(numero: string) {
   return String(numero || "").replace(/\D/g, "");
@@ -130,12 +216,15 @@ function primeiroNome(nome: string) {
 
 function formatarDataBR(data?: string | null) {
   if (!data) return "-";
-  const d = new Date(data);
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(data);
+  const d = isDateOnly ? new Date(`${data}T00:00:00`) : new Date(data);
   if (Number.isNaN(d.getTime())) return data;
   return d.toLocaleDateString("pt-BR");
 }
 
-/* respostas */
+/* =========================
+   RESPOSTAS
+   ========================= */
 
 function menuPrincipal(nome: string) {
   return (
@@ -153,38 +242,47 @@ function menuPrincipal(nome: string) {
 function montarRespostaTreino(
   nome: string,
   treino: {
-    nome: string;
-    treino_exercicios?: Array<{
-      exercicio_nome?: string | null;
+    titulo?: string | null;
+    nome?: string | null;
+    dia?: string | null;
+    exercicios?: Array<{
       nome?: string | null;
+      exercicio_nome?: string | null;
       series?: string | null;
       repeticoes?: string | null;
       carga?: string | null;
+      descanso?: string | null;
+      obs?: string | null;
+      observacoes?: string | null;
     }>;
   }
 ) {
-  const exercicios = treino.treino_exercicios || [];
+  const tituloTreino =
+    treino.titulo || treino.nome || treino.dia || "Treino atual";
+
+  const exercicios = Array.isArray(treino.exercicios) ? treino.exercicios : [];
 
   if (!exercicios.length) {
     return (
-      `💪 ${nome}, encontrei seu treino *${treino.nome}*, mas ele ainda não possui exercícios cadastrados.\n\n` +
+      `💪 ${nome}, encontrei seu treino *${tituloTreino}*, mas ele ainda não possui exercícios cadastrados.\n\n` +
       "Digite:\n4️⃣ Falar com professor\n0️⃣ Menu"
     );
   }
 
   const linhas = exercicios
     .slice(0, 8)
-    .map((ex) => {
-      const nomeEx = ex.exercicio_nome || ex.nome || "Exercício";
+    .map((ex, index) => {
+      const nomeEx = ex.nome || ex.exercicio_nome || `Exercício ${index + 1}`;
       const sr =
         ex.series && ex.repeticoes ? ` — ${ex.series}x${ex.repeticoes}` : "";
       const carga = ex.carga ? ` | carga: ${ex.carga}` : "";
-      return `• ${nomeEx}${sr}${carga}`;
+      const descanso = ex.descanso ? ` | descanso: ${ex.descanso}` : "";
+      return `• ${nomeEx}${sr}${carga}${descanso}`;
     })
     .join("\n");
 
   return (
-    `💪 ${nome}, seu treino de hoje é *${treino.nome}*:\n\n` +
+    `💪 ${nome}, seu treino é *${tituloTreino}*:\n\n` +
     `${linhas}\n\n` +
     "Digite:\n4️⃣ Falar com professor\n0️⃣ Menu"
   );
@@ -192,7 +290,7 @@ function montarRespostaTreino(
 
 function respostaSemTreino(nome: string) {
   return (
-    `💪 ${nome}, não encontrei treino ativo para hoje.\n\n` +
+    `💪 ${nome}, não encontrei treino ativo para você no momento.\n\n` +
     "Digite:\n4️⃣ Falar com professor\n0️⃣ Menu"
   );
 }
@@ -200,16 +298,14 @@ function respostaSemTreino(nome: string) {
 function montarRespostaFinanceiro(
   nome: string,
   itens: Array<{
+    id?: number | null;
     competencia?: string | null;
     valor?: number | null;
     vencimento?: string | null;
   }>
 ) {
   if (!itens.length) {
-    return (
-      `💰 ${nome}, você está em dia com a academia ✅\n\n` +
-      "Digite:\n0️⃣ Menu"
-    );
+    return `💰 ${nome}, você está em dia com a academia ✅\n\nDigite:\n0️⃣ Menu`;
   }
 
   const total = itens.reduce((acc, item) => acc + Number(item.valor || 0), 0);
@@ -228,8 +324,62 @@ function montarRespostaFinanceiro(
     `💰 ${nome}, você possui ${itens.length} mensalidade(s) em aberto.\n` +
     `Total: R$ ${total.toFixed(2)}\n\n` +
     `${linhas}\n\n` +
-    "Digite:\n5️⃣ Falar com recepção\n0️⃣ Menu"
+    "Digite:\n" +
+    "6️⃣ Solicitar link de pagamento\n" +
+    "5️⃣ Falar com recepção\n" +
+    "0️⃣ Menu"
   );
+}
+
+async function processarSolicitacaoLinkPagamento(
+  alunoId: number,
+  academiaId: string,
+  nome: string
+) {
+  try {
+    const pagamento = await buscarPagamentoAtualComLink(alunoId, academiaId);
+
+    if (!pagamento) {
+      return (
+        `💰 ${nome}, você não possui mensalidades em aberto no momento.\n\n` +
+        "Digite:\n0️⃣ Menu"
+      );
+    }
+
+    if (!pagamento.link_pagamento) {
+      return (
+        `💳 ${nome}, encontrei sua mensalidade *${pagamento.competencia}* no valor de R$ ${pagamento.valor.toFixed(
+          2
+        )}, mas sua academia ainda não gerou uma cobrança online para ela.\n\n` +
+        "Digite:\n5️⃣ Falar com recepção\n0️⃣ Menu"
+      );
+    }
+
+    const venc = formatarDataBR(pagamento.vencimento);
+
+    return (
+      `💳 ${nome}, segue seu link de pagamento:\n\n` +
+      `${pagamento.link_pagamento}\n\n` +
+      `Competência: ${pagamento.competencia}\n` +
+      `Valor: R$ ${pagamento.valor.toFixed(2)}\n` +
+      `Vencimento: ${venc}\n` +
+      `${pagamento.gateway ? `Gateway: ${pagamento.gateway}\n` : ""}` +
+      `${
+        pagamento.gateway_status
+          ? `Status online: ${pagamento.gateway_status}\n`
+          : ""
+      }\n` +
+      "Após o pagamento, a confirmação pode levar alguns instantes.\n\n" +
+      "Digite:\n0️⃣ Menu"
+    );
+  } catch (error) {
+    console.error("Erro ao buscar link de pagamento:", error);
+
+    return (
+      `💳 ${nome}, não consegui recuperar seu link de pagamento agora.\n\n` +
+      "Digite:\n5️⃣ Falar com recepção\n0️⃣ Menu"
+    );
+  }
 }
 
 function respostaHorarios(nome: string) {

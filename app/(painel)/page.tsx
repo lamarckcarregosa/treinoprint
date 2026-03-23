@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -32,6 +33,7 @@ type Permissoes = {
   sistema?: boolean;
   alterar_senha?: boolean;
   avaliacoes?: boolean;
+  whatsapp?: boolean;
 };
 
 type Atalho = {
@@ -172,6 +174,7 @@ export default function InicioPage() {
           sistema: true,
           alterar_senha: true,
           avaliacoes: true,
+          whatsapp: true,
         });
         return;
       }
@@ -319,6 +322,18 @@ export default function InicioPage() {
       cardGlow: "hover:ring-2 hover:ring-violet-100",
     },
     {
+  chave: "whatsapp",
+  titulo: "WhatsApp",
+  descricao: "Atendimento e automações",
+  href: "/whatsapp",
+  icon: MessageCircle,
+  iconBg: "bg-green-100",
+  iconText: "text-green-700",
+  badgeBg: "bg-green-50",
+  badgeText: "text-green-700",
+  cardGlow: "hover:ring-2 hover:ring-green-100",
+},
+    {
       chave: "alterar_senha",
       titulo: "Alterar senha",
       descricao: "Atualize sua senha de acesso",
@@ -345,7 +360,7 @@ export default function InicioPage() {
 
   const favoritos = useMemo(() => {
     const ordemPreferida = [
-      "/dashboard",
+      "/whatsapp",
       "/imprimir",
       "/alunos",
       "/pagamentos",

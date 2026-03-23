@@ -14,6 +14,7 @@ const permissoesPadrao = {
   superadmin: false,
   alterar_senha: false,
   avaliacoes: false,
+  whatsapp: false,
 };
 
 export async function GET(req: NextRequest) {
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
     const { data: permissoes, error: permissoesError } = await supabaseServer
       .from("permissoes_usuarios")
       .select(
-        "profile_id, dashboard, alunos, personais, treinos, imprimir, pagamentos, financeiro, sistema, superadmin, alterar_senha, avaliacoes"
+        "profile_id, dashboard, alunos, personais, treinos, imprimir, pagamentos, financeiro, sistema, superadmin, alterar_senha, avaliacoes, whatsapp"
       )
       .eq("academia_id", academiaId);
 
@@ -95,6 +96,7 @@ export async function POST(req: NextRequest) {
       superadmin: !!permissoes.superadmin,
       alterar_senha: !!permissoes.alterar_senha,
       avaliacoes: !!permissoes.avaliacoes,
+      whatsapp: !!permissoes.whatsapp,
     };
 
     const { data, error } = await supabaseServer

@@ -27,6 +27,7 @@ type Permissoes = {
   superadmin: boolean;
   alterar_senha: boolean;
   avaliacoes: boolean;
+  whatsapp: boolean;
 };
 
 type UsuarioPermissao = {
@@ -49,6 +50,7 @@ const colunas: { chave: keyof Permissoes; label: string }[] = [
   { chave: "sistema", label: "Sistema" },
   { chave: "alterar_senha", label: "Senha" },
   { chave: "avaliacoes", label: "Avaliações" },
+  { chave: "whatsapp", label: "Whatsapp" },
 ];
 
 function BadgeStatus({ ativo }: { ativo?: boolean }) {
