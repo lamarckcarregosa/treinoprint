@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import AlertasInicio from "@/components/home/AlertasInicio";
+import BellAlertas from "@/components/home/BellAlertas";
 import {
+  MessageCircle,
   LayoutDashboard,
   Printer,
   Users,
@@ -19,6 +21,10 @@ import {
   BadgeCheck,
   Sparkles,
   Star,
+  Zap,
+  Bell,
+  CheckCircle2,
+  CircleUserRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -142,6 +148,65 @@ function CardFavorito({
   );
 }
 
+function CardResumo({
+  titulo,
+  valor,
+  subtitulo,
+  icon: Icon,
+  corValor = "text-gray-900",
+}: {
+  titulo: string;
+  valor: string | number;
+  subtitulo: string;
+  icon: LucideIcon;
+  corValor?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm text-gray-500">{titulo}</p>
+          <p className={`text-2xl font-black mt-2 ${corValor}`}>{valor}</p>
+          <p className="mt-3 inline-flex items-center gap-2 text-sm text-gray-600">
+            <Icon size={16} />
+            {subtitulo}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CardOperacional({
+  titulo,
+  descricao,
+  icon: Icon,
+  onClick,
+}: {
+  titulo: string;
+  descricao: string;
+  icon: LucideIcon;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="group w-full rounded-2xl border border-black/5 bg-white p-4 shadow-sm hover:shadow-md transition text-left"
+    >
+      <div className="flex items-start gap-3">
+        <div className="w-11 h-11 rounded-2xl bg-zinc-100 text-zinc-700 flex items-center justify-center shrink-0">
+          <Icon size={18} />
+        </div>
+
+        <div className="min-w-0">
+          <p className="font-semibold text-gray-900">{titulo}</p>
+          <p className="text-sm text-gray-500 mt-1">{descricao}</p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 export default function InicioPage() {
   const router = useRouter();
 
@@ -206,6 +271,7 @@ export default function InicioPage() {
           pagamentos: true,
           alunos: true,
           alterar_senha: true,
+          whatsapp: true,
         });
         return;
       }
@@ -322,17 +388,17 @@ export default function InicioPage() {
       cardGlow: "hover:ring-2 hover:ring-violet-100",
     },
     {
-  chave: "whatsapp",
-  titulo: "WhatsApp",
-  descricao: "Atendimento e automações",
-  href: "/whatsapp",
-  icon: MessageCircle,
-  iconBg: "bg-green-100",
-  iconText: "text-green-700",
-  badgeBg: "bg-green-50",
-  badgeText: "text-green-700",
-  cardGlow: "hover:ring-2 hover:ring-green-100",
-},
+      chave: "whatsapp",
+      titulo: "WhatsApp",
+      descricao: "Atendimento e automações",
+      href: "/whatsapp",
+      icon: MessageCircle,
+      iconBg: "bg-green-100",
+      iconText: "text-green-700",
+      badgeBg: "bg-green-50",
+      badgeText: "text-green-700",
+      cardGlow: "hover:ring-2 hover:ring-green-100",
+    },
     {
       chave: "alterar_senha",
       titulo: "Alterar senha",
@@ -376,6 +442,20 @@ export default function InicioPage() {
       .slice(0, 4);
   }, [atalhosVisiveis]);
 
+  const operacionais = useMemo(() => {
+    return atalhosVisiveis
+      .filter((item) =>
+        [
+          "/whatsapp",
+          "/financeiro",
+          "/treinos",
+          "/imprimir",
+          "/usuarios/novasenha",
+        ].includes(item.href)
+      )
+      .slice(0, 5);
+  }, [atalhosVisiveis]);
+
   const totalModulos = atalhosVisiveis.length;
 
   const totalPermissoes = useMemo(() => {
@@ -391,13 +471,26 @@ export default function InicioPage() {
     return perfilAtual;
   }, [perfilAtual]);
 
+  const statusOperacao = useMemo(() => {
+    if (perfilAtual === "admin" || perfilAtual === "superadmin") {
+      return "Gestão completa";
+    }
+    if (perfilAtual === "personal") {
+      return "Treinos e acompanhamento";
+    }
+    if (perfilAtual === "recepcao") {
+      return "Atendimento e cobranças";
+    }
+    return "Acesso básico";
+  }, [perfilAtual]);
+
   return (
     <main className="space-y-6">
       <section className="rounded-[32px] bg-gradient-to-r from-black to-zinc-800 text-white p-6 md:p-8 overflow-hidden relative">
         <div className="absolute -right-10 -top-10 w-72 h-72 bg-[#7CFC00]/10 blur-3xl rounded-full" />
 
         <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
-          <div>
+          <div className="min-w-0">
             <p className="text-sm text-zinc-300">Painel inicial</p>
             <h1 className="text-3xl md:text-4xl font-black mt-2">
               Bem-vindo, {nomeUsuario}
@@ -406,52 +499,81 @@ export default function InicioPage() {
               {nomeAcademia} • Perfil atual:{" "}
               <span className="font-semibold">{perfilLabel}</span>
             </p>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm text-white/90">
+                <CircleUserRound size={14} />
+                {perfilLabel}
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm text-white/90">
+                <Zap size={14} />
+                {statusOperacao}
+              </span>
+            </div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4 min-w-[240px]">
-            <p className="text-white/60 text-xs">Status do sistema</p>
-            <p className="text-xl font-black mt-1">TreinoPrint Online</p>
-            <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
-              <Activity size={16} />
-              Sistema online
+          <div className="flex flex-col gap-4 xl:min-w-[430px]">
+            <div className="flex justify-end">
+              <BellAlertas />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4">
+                <p className="text-white/60 text-xs">Status do sistema</p>
+                <p className="text-xl font-black mt-1">TreinoPrint Online</p>
+                <div className="flex items-center gap-2 text-[#7CFC00] mt-3 text-sm font-semibold">
+                  <Activity size={16} />
+                  Sistema online
+                </div>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur rounded-3xl px-5 py-4">
+                <p className="text-white/60 text-xs">Centro de avisos</p>
+                <p className="text-xl font-black mt-1">Operação ativa</p>
+                <div className="flex justify-end pb-1 text-sm font-semibold">
+                  <Bell size={10} />
+                  Alertas inteligentes ativos
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
+      
+      <AlertasInicio />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
-          <p className="text-sm text-gray-500">Módulos liberados</p>
-          <p className="text-2xl font-black text-blue-600 mt-2">
-            {totalModulos}
-          </p>
-          <div className="mt-3 inline-flex items-center gap-2 text-sm text-gray-600">
-            <Blocks size={16} />
-            Acessos rápidos disponíveis
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <CardResumo
+          titulo="Módulos liberados"
+          valor={totalModulos}
+          subtitulo="Acessos rápidos disponíveis"
+          icon={Blocks}
+          corValor="text-blue-600"
+        />
 
-        <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
-          <p className="text-sm text-gray-500">Permissões ativas</p>
-          <p className="text-2xl font-black text-emerald-600 mt-2">
-            {totalPermissoes}
-          </p>
-          <div className="mt-3 inline-flex items-center gap-2 text-sm text-gray-600">
-            <BadgeCheck size={16} />
-            Liberadas para este perfil
-          </div>
-        </div>
+        <CardResumo
+          titulo="Permissões ativas"
+          valor={totalPermissoes}
+          subtitulo="Liberadas para este perfil"
+          icon={BadgeCheck}
+          corValor="text-emerald-600"
+        />
 
-        <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
-          <p className="text-sm text-gray-500">Acesso à senha</p>
-          <p className="text-2xl font-black text-violet-600 mt-2">
-            {permissoes.alterar_senha ? "Sim" : "Não"}
-          </p>
-          <div className="mt-3 inline-flex items-center gap-2 text-sm text-gray-600">
-            <KeyRound size={16} />
-            Alteração de credenciais
-          </div>
-        </div>
+        <CardResumo
+          titulo="Acesso à senha"
+          valor={permissoes.alterar_senha ? "Sim" : "Não"}
+          subtitulo="Alteração de credenciais"
+          icon={KeyRound}
+          corValor="text-violet-600"
+        />
+
+        <CardResumo
+          titulo="Perfil operacional"
+          valor={perfilLabel}
+          subtitulo="Tipo de acesso atual"
+          icon={CheckCircle2}
+          corValor="text-zinc-900"
+        />
       </div>
 
       <section className="rounded-[28px] bg-white border border-black/5 shadow-sm p-5">
@@ -485,44 +607,73 @@ export default function InicioPage() {
         )}
       </section>
 
-      <section className="rounded-[28px] bg-white border border-black/5 shadow-sm p-5">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <section className="xl:col-span-2 rounded-[28px] bg-white border border-black/5 shadow-sm p-5">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Acessos rápidos</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Os módulos exibidos abaixo seguem as permissões do usuário logado.
+              </p>
+            </div>
+
+            <div className="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700">
+              <Sparkles size={14} />
+              Área principal do sistema
+            </div>
+          </div>
+
+          {atalhosVisiveis.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-4 text-sm text-yellow-700">
+              Nenhum módulo liberado para este perfil no momento.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-6">
+              {atalhosVisiveis.map((item) => (
+                <CardAtalho
+                  key={item.href}
+                  titulo={item.titulo}
+                  descricao={item.descricao}
+                  icon={item.icon}
+                  iconBg={item.iconBg}
+                  iconText={item.iconText}
+                  badgeBg={item.badgeBg}
+                  badgeText={item.badgeText}
+                  cardGlow={item.cardGlow}
+                  onClick={() => router.push(item.href)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-[28px] bg-white border border-black/5 shadow-sm p-5">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Acessos rápidos</h2>
+            <h2 className="text-lg font-bold text-gray-900">Operação rápida</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Os módulos exibidos abaixo seguem as permissões do usuário logado.
+              Atalhos mais usados no dia a dia.
             </p>
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700">
-            <Sparkles size={14} />
-            Área principal do sistema
+          <div className="space-y-3 mt-6">
+            {operacionais.length === 0 ? (
+              <div className="rounded-2xl border border-dashed p-4 text-sm text-gray-500">
+                Nenhum atalho operacional disponível.
+              </div>
+            ) : (
+              operacionais.map((item) => (
+                <CardOperacional
+                  key={item.href}
+                  titulo={item.titulo}
+                  descricao={item.descricao}
+                  icon={item.icon}
+                  onClick={() => router.push(item.href)}
+                />
+              ))
+            )}
           </div>
-        </div>
-
-        {atalhosVisiveis.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-4 text-sm text-yellow-700">
-            Nenhum módulo liberado para este perfil no momento.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
-            {atalhosVisiveis.map((item) => (
-              <CardAtalho
-                key={item.href}
-                titulo={item.titulo}
-                descricao={item.descricao}
-                icon={item.icon}
-                iconBg={item.iconBg}
-                iconText={item.iconText}
-                badgeBg={item.badgeBg}
-                badgeText={item.badgeText}
-                cardGlow={item.cardGlow}
-                onClick={() => router.push(item.href)}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+        </section>
+      </div>
     </main>
   );
 }
